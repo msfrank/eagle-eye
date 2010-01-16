@@ -104,7 +104,7 @@ open_next_url (EEWindowPrivate *private)
 static gboolean
 on_timeout (EEWindowPrivate *private)
 {
-    g_debug ("timeout");
+    g_debug ("cycling to next URL");
     open_next_url (private);
     return TRUE;
 }
@@ -141,10 +141,16 @@ static void
 on_toggled_pause (GtkToggleToolButton *         button,
                   EEWindowPrivate *             private)
 {
-    if (gtk_toggle_tool_button_get_active (button))
+    if (gtk_toggle_tool_button_get_active (button)) {
+        g_source_remove (private->timeout_id);
+        private->timeout_id = 0;
         g_debug ("---- PAUSE ----");
-    else
+    }
+    else {
+        private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+            (GSourceFunc) on_timeout, private);
         g_debug ("---- UNPAUSE ----");
+    }
 }
 
 static void
@@ -178,6 +184,7 @@ ee_main_window_construct(EESettings *settings)
     GtkToolItem *pause;
     GtkToolItem *fullscreen;
     GtkWidget *status;
+    GtkWidget *align;
     GtkToolItem *status_item;
 
     private = g_new0 (EEWindowPrivate, 1);
@@ -249,8 +256,11 @@ ee_main_window_construct(EESettings *settings)
     /* create the status area and add it to the toolbar */
     status = gtk_label_new (NULL);
     private->status = GTK_LABEL (status);
+    align = gtk_alignment_new (0.0, 0.5, 1.0, 1.0);
+    gtk_alignment_set_padding (GTK_ALIGNMENT (align), 0, 0, 12, 12);
+    gtk_container_add (GTK_CONTAINER (align), status);
     status_item = gtk_tool_item_new ();
-    gtk_container_add (GTK_CONTAINER (status_item), status);
+    gtk_container_add (GTK_CONTAINER (status_item), align);
     gtk_tool_item_set_expand(status_item, TRUE);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), status_item, -1);
 
