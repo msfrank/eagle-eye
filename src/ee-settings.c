@@ -84,11 +84,16 @@ read_urls_file (const gchar *path, EESettings *settings)
             break;
         if (status == G_IO_STATUS_ERROR)
             break;
+        s = g_strstrip (s);
         uri = soup_uri_new (s);
-        if (uri && SOUP_URI_VALID_FOR_HTTP (uri))
+        if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
             settings->urls = g_list_append (settings->urls, uri);  
-        else if (uri)
-            soup_uri_free (uri);
+            g_debug ("added URL %s", s);
+        }
+        else {
+            if (uri)
+                soup_uri_free (uri);
+        }
     }
 
     g_io_channel_unref (ioc);

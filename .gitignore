@@ -13,3 +13,5 @@ mkinstalldirs
 src/.deps
 src/Makefile
 src/Makefile.in
+src/*.o
+src/eagle-eye

@@ -11,6 +11,7 @@ typedef struct {
     GList *curr_url;
 } EEWindowPrivate;
 
+
 static void
 on_window_destroy (GtkWindow *          window,
                    EEWindowPrivate *    private)
@@ -24,7 +25,16 @@ on_load_started (WebKitWebView *        webview,
                  WebKitWebFrame *       frame,
                  EEWindowPrivate *      private)
 {
-    return;
+    SoupURI *uri;
+    gchar *uri_string;
+    gchar *status;
+
+    uri = (SoupURI *) private->curr_url->data;
+    uri_string = soup_uri_to_string (uri, FALSE);
+    status = g_strdup_printf ("loading %s", uri_string);
+    gtk_label_set_text (private->status, status);
+    g_free (status);
+    g_free (uri_string);
 }
 
 static void
@@ -32,7 +42,7 @@ on_load_finished (WebKitWebView *       webview,
                   WebKitWebFrame *      frame,
                   EEWindowPrivate *     private)
 {
-    return;
+    gtk_label_set_text (private->status, "");
 }
 
 static void
@@ -41,7 +51,62 @@ on_title_changed (WebKitWebView *       webview,
                   gchar *               title,
                   EEWindowPrivate *     private)
 {
-    return;
+    gchar *window_title;
+
+    window_title = g_strdup_printf ("Eagle Eye - %s", title);
+    gtk_window_set_title (private->window, window_title);
+    g_free (window_title);
+}
+
+static gboolean
+load_url (EEWindowPrivate *private)
+{
+    SoupURI *url;
+    gchar *s;
+
+    if (private->curr_url == NULL)
+        return FALSE;
+    s = soup_uri_to_string ((SoupURI *)private->curr_url->data, FALSE);
+    g_debug ("opening URL: %s", s);
+    webkit_web_view_load_uri (private->webview, s);
+    g_free (s);
+    return TRUE;
+}
+
+static void
+open_previous_url (EEWindowPrivate *private)
+{
+    GList *prev;
+
+    prev = g_list_previous (private->curr_url);
+    if (prev == NULL)
+        prev = g_list_last (private->settings->urls);
+    if (prev == NULL)
+        return;
+    private->curr_url = prev;
+    load_url (private);
+}
+
+static void
+open_next_url (EEWindowPrivate *private)
+{
+    GList *next;
+
+    next = g_list_next (private->curr_url);
+    if (next == NULL)
+        next = g_list_first (private->settings->urls);
+    if (next == NULL)
+        return;
+    private->curr_url = next;
+    load_url (private);
+}
+
+static gboolean
+on_timeout (EEWindowPrivate *private)
+{
+    g_debug ("timeout");
+    open_next_url (private);
+    return TRUE;
 }
 
 static void
@@ -49,6 +114,13 @@ on_clicked_back (GtkToolButton *        button,
                  EEWindowPrivate *      private)
 {
     g_debug ("---- BACK ----");
+    if (private->timeout_id > 0) {
+        g_source_remove (private->timeout_id);
+        private->timeout_id = 0;
+    }
+    open_previous_url (private);
+    private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+        (GSourceFunc) on_timeout, private);
 }
 
 static void
@@ -56,6 +128,13 @@ on_clicked_forward (GtkToolButton *     button,
                     EEWindowPrivate *   private)
 {
     g_debug ("---- FORWARD ----");
+    if (private->timeout_id > 0) {
+        g_source_remove (private->timeout_id);
+        private->timeout_id = 0;
+    }
+    open_next_url (private);
+    private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+        (GSourceFunc) on_timeout, private);
 }
 
 static void
@@ -72,10 +151,14 @@ static void
 on_toggled_fullscreen (GtkToggleToolButton *    button,
                        EEWindowPrivate *        private)
 {
-    if (gtk_toggle_tool_button_get_active (button))
+    if (gtk_toggle_tool_button_get_active (button)) {
+        gtk_window_fullscreen (private->window);
         g_debug ("---- FULLSCREEN ON ----");
-    else
+    }
+    else {
+        gtk_window_unfullscreen (private->window);
         g_debug ("---- FULLSCREEN OFF ----");
+    }
 }
  
 /*
@@ -101,7 +184,7 @@ ee_main_window_construct(EESettings *settings)
 
     private->settings = settings;
     private->timeout_id = 0;
-    private->curr_url = NULL;
+    private->curr_url = settings->urls;
 
     /* create the toplevel window */ 
     window = (GtkWindow *) gtk_window_new (GTK_WINDOW_TOPLEVEL);
@@ -176,6 +259,13 @@ ee_main_window_construct(EESettings *settings)
     /* if start-fullscreen is true, then make the window fullscreen */
     if (settings->start_fullscreen == TRUE)
         gtk_window_fullscreen (window);
+
+    /* load the first URL */
+    load_url (private);
+
+    /* start running the timeout function */
+    private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+        (GSourceFunc) on_timeout, private);
 
     return window;
 }
