@@ -76,6 +76,7 @@ read_urls_file (const gchar *path, EESettings *settings)
 
     while (1) {
         SoupURI *uri;
+        gchar *id;
 
         status = g_io_channel_read_line (ioc, &s, &len, NULL, &error);
         if (status == G_IO_STATUS_AGAIN)
@@ -87,8 +88,10 @@ read_urls_file (const gchar *path, EESettings *settings)
         s = g_strstrip (s);
         uri = soup_uri_new (s);
         if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
+            id = soup_uri_to_string (uri, FALSE);
             settings->urls = g_list_append (settings->urls, uri);  
-            g_debug ("added URL %s", s);
+            g_debug ("added URL %s", id);
+            g_free (id);
         }
         else {
             if (uri)

@@ -13,7 +13,9 @@ typedef struct {
     GList *curr_url;
 } EEWindowPrivate;
 
-
+/*
+ * on_window_destroy: callback when destroying the main window
+ */
 static void
 on_window_destroy (GtkWindow *          window,
                    EEWindowPrivate *    private)
@@ -22,6 +24,9 @@ on_window_destroy (GtkWindow *          window,
     gtk_main_quit ();
 }
 
+/*
+ * on_load_started: callback when we start loading a new URL
+ */
 static void
 on_load_started (WebKitWebView *        webview,
                  WebKitWebFrame *       frame,
@@ -39,6 +44,9 @@ on_load_started (WebKitWebView *        webview,
     g_free (uri_string);
 }
 
+/*
+ * on_http_auth: callback when HTTP authorization is requested
+ */
 static void
 on_http_auth (SoupSession *         session,
               SoupMessage *         message,
@@ -46,19 +54,25 @@ on_http_auth (SoupSession *         session,
               gboolean              retrying,
               EEWindowPrivate *     private)
 {
-    SoupURI *uri;
+    SoupURI *uri, *creds;
 
+    /* retrying is pointless, we just return (which causes the load to fail) */
     if (retrying) {
         g_debug ("HTTP auth was rejected by server");
         return;
     }
     uri = soup_message_get_uri (message);
-    if (uri->user && uri->password)
-        soup_auth_authenticate (auth, uri->user, uri->password);
+    creds = (SoupURI *) private->curr_url->data;
+    if (creds->user && creds->password)
+        soup_auth_authenticate (auth, creds->user, creds->password);
     else
         g_debug ("HTTP auth missing credentials");
+    /* note that uri is *not* freed, we don't own that memory */
 }
 
+/*
+ * on_load_finished: callback when we've finished loading a URL
+ */
 static void
 on_load_finished (WebKitWebView *       webview,
                   WebKitWebFrame *      frame,
@@ -67,6 +81,10 @@ on_load_finished (WebKitWebView *       webview,
     gtk_label_set_text (private->status, "");
 }
 
+/*
+ * on_title_changed: callback to change the main window title when
+ *   the title of the URL resource changes
+ */
 static void
 on_title_changed (WebKitWebView *       webview,
                   WebKitWebFrame *      frame,
@@ -80,6 +98,9 @@ on_title_changed (WebKitWebView *       webview,
     g_free (window_title);
 }
 
+/*
+ * load_url: loads private->curr_url into the webview widget
+ */
 static gboolean
 load_url (EEWindowPrivate *private)
 {
@@ -95,34 +116,49 @@ load_url (EEWindowPrivate *private)
     return TRUE;
 }
 
+/*
+ * open_previous_url: jump to the previous URL and load it
+ */
 static void
 open_previous_url (EEWindowPrivate *private)
 {
     GList *prev;
 
+    /* get the next URL in the list */
     prev = g_list_previous (private->curr_url);
+    /* if NULL, then try to wrap around to the last URL in the list */
     if (prev == NULL)
         prev = g_list_last (private->settings->urls);
+    /* if still NULL, then there are no URLS in the list, so return */
     if (prev == NULL)
         return;
     private->curr_url = prev;
     load_url (private);
 }
 
+/*
+ * open_next_url: jump to the next URL and load it
+ */
 static void
 open_next_url (EEWindowPrivate *private)
 {
     GList *next;
 
+    /* get the next URL in the list */
     next = g_list_next (private->curr_url);
+    /* if NULL, then try to wrap around to the first URL in the list */
     if (next == NULL)
         next = g_list_first (private->settings->urls);
+    /* if still NULL, then there are no URLS in the list, so return */
     if (next == NULL)
         return;
     private->curr_url = next;
     load_url (private);
 }
 
+/*
+ * on_timeout: loads the next URL every time the cycle-time timeout expires
+ */
 static gboolean
 on_timeout (EEWindowPrivate *private)
 {
@@ -131,34 +167,52 @@ on_timeout (EEWindowPrivate *private)
     return TRUE;
 }
 
+/*
+ * on_clicked_back: load the previous URL when the user clicks the back button
+ */
 static void
 on_clicked_back (GtkToolButton *        button,
                  EEWindowPrivate *      private)
 {
+    guint timeout_id = private->timeout_id;
+
     g_debug ("---- BACK ----");
-    if (private->timeout_id > 0) {
-        g_source_remove (private->timeout_id);
+    if (timeout_id > 0) {
+        g_source_remove (timeout_id);
         private->timeout_id = 0;
     }
     open_previous_url (private);
-    private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
-        (GSourceFunc) on_timeout, private);
+    /* if we are not paused, then reschedule the cycle timeout */
+    if (timeout_id > 0)
+        private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+            (GSourceFunc) on_timeout, private);
 }
 
+/*
+ * on_clicked_forward: load the next URL when the user clicks the back button
+ */
 static void
 on_clicked_forward (GtkToolButton *     button,
                     EEWindowPrivate *   private)
 {
+    guint timeout_id = private->timeout_id;
+
     g_debug ("---- FORWARD ----");
-    if (private->timeout_id > 0) {
-        g_source_remove (private->timeout_id);
+    if (timeout_id > 0) {
+        g_source_remove (timeout_id);
         private->timeout_id = 0;
     }
     open_next_url (private);
-    private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
-        (GSourceFunc) on_timeout, private);
+    /* if we are not paused, then reschedule the cycle timeout */
+    if (timeout_id > 0)
+        private->timeout_id = g_timeout_add_seconds (private->settings->cycle_time,
+            (GSourceFunc) on_timeout, private);
 }
 
+/*
+ * on_toggled_pause: enable or disable page cycling when the user toggles the
+ *   pause button
+ */
 static void
 on_toggled_pause (GtkToggleToolButton *         button,
                   EEWindowPrivate *             private)
@@ -175,6 +229,10 @@ on_toggled_pause (GtkToggleToolButton *         button,
     }
 }
 
+/*
+ * on_toggled_fullscreen: enable or disable fullscreen mode when the user
+ *   toggles the fullscreen button
+ */
 static void
 on_toggled_fullscreen (GtkToggleToolButton *    button,
                        EEWindowPrivate *        private)
@@ -211,6 +269,7 @@ ee_main_window_construct(EESettings *settings)
 
     private = g_new0 (EEWindowPrivate, 1);
 
+    /* set the private data for the main window */
     private->settings = settings;
     private->timeout_id = 0;
     private->curr_url = settings->urls;
