@@ -1,11 +1,13 @@
 #include <gtk/gtk.h>
 #include <webkit/webkit.h>
+#include <libsoup/soup.h>
 #include <ee-settings.h>
 
 typedef struct {
     EESettings *settings;
     GtkWindow *window;
     WebKitWebView *webview;
+    SoupSession *session;
     GtkLabel *status;
     guint timeout_id;
     GList *curr_url;
@@ -35,6 +37,26 @@ on_load_started (WebKitWebView *        webview,
     gtk_label_set_text (private->status, status);
     g_free (status);
     g_free (uri_string);
+}
+
+static void
+on_http_auth (SoupSession *         session,
+              SoupMessage *         message,
+              SoupAuth *            auth,
+              gboolean              retrying,
+              EEWindowPrivate *     private)
+{
+    SoupURI *uri;
+
+    if (retrying) {
+        g_debug ("HTTP auth was rejected by server");
+        return;
+    }
+    uri = soup_message_get_uri (message);
+    if (uri->user && uri->password)
+        soup_auth_authenticate (auth, uri->user, uri->password);
+    else
+        g_debug ("HTTP auth missing credentials");
 }
 
 static void
@@ -215,6 +237,12 @@ ee_main_window_construct(EESettings *settings)
         G_CALLBACK (on_load_finished), private);
     g_signal_connect(WEBKIT_WEB_VIEW (webview), "title-changed",
         G_CALLBACK (on_title_changed), private);
+
+    /* configure the SoupSession */
+    private->session = webkit_get_default_session ();
+    g_signal_connect (private->session, "authenticate",
+        G_CALLBACK (on_http_auth), private);
+    soup_session_remove_feature_by_type (private->session, WEBKIT_TYPE_SOUP_AUTH_DIALOG);
 
     /* put the webview in a scrolled window and put that in the vbox */
     sw = gtk_scrolled_window_new (NULL, NULL);
