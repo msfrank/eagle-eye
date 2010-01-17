@@ -328,22 +328,26 @@ ee_main_window_construct(EESettings *settings)
 
     /* add the toolbar items */
     back = gtk_tool_button_new_from_stock (GTK_STOCK_MEDIA_PREVIOUS);
+    gtk_tool_item_set_tooltip_text (back, "Previous URL");
     g_signal_connect (back, "clicked",
         G_CALLBACK (on_clicked_back), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), back, -1);
     forward = gtk_tool_button_new_from_stock (GTK_STOCK_MEDIA_NEXT);
+    gtk_tool_item_set_tooltip_text (forward, "Next URL");
     g_signal_connect (forward, "clicked",
         G_CALLBACK (on_clicked_forward), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), forward, -1);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), gtk_separator_tool_item_new (), -1);
     pause = gtk_toggle_tool_button_new_from_stock (GTK_STOCK_MEDIA_PAUSE);
     gtk_toggle_tool_button_set_active (GTK_TOGGLE_TOOL_BUTTON (pause), FALSE);
+    gtk_tool_item_set_tooltip_text (pause, "Pause URL cycling");
     g_signal_connect (pause, "toggled",
         G_CALLBACK (on_toggled_pause), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), pause, -1);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), gtk_separator_tool_item_new (), -1);
     fullscreen = gtk_toggle_tool_button_new_from_stock (GTK_STOCK_FULLSCREEN);
     gtk_toggle_tool_button_set_active(GTK_TOGGLE_TOOL_BUTTON (fullscreen), FALSE);
+    gtk_tool_item_set_tooltip_text (fullscreen, "Toggle fullscreen mode");
     g_signal_connect (fullscreen, "toggled",
         G_CALLBACK (on_toggled_fullscreen), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), fullscreen, -1);
