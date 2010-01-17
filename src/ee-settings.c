@@ -75,6 +75,7 @@ read_urls_file (const gchar *path, EESettings *settings)
     gchar *s;
     gsize len;
     
+    /* try to open the urls file */
     ioc = g_io_channel_new_file (path, "r", &error);
     if (error) {
         g_warning ("failed to open %s: %s", path, error->message);
@@ -84,29 +85,27 @@ read_urls_file (const gchar *path, EESettings *settings)
         return;
     }
 
+    /* loop reading each line of the file */
     while (1) {
-        SoupURI *uri;
-        gchar *id;
-
         status = g_io_channel_read_line (ioc, &s, &len, NULL, &error);
         if (status == G_IO_STATUS_AGAIN)
             continue;
         if (status == G_IO_STATUS_EOF)
             break;
-        if (status == G_IO_STATUS_ERROR)
+        if (status == G_IO_STATUS_ERROR) {
+            g_warning ("error parsing urls file: %s", error->message);
+            g_error_free (error);
             break;
+        }
+        /* remove leading and trailing whitespace */
         s = g_strstrip (s);
-        uri = soup_uri_new (s);
-        if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
-            id = soup_uri_to_string (uri, FALSE);
-            settings->urls = g_list_append (settings->urls, uri);  
-            g_debug ("added URL %s", id);
-            g_free (id);
-        }
-        else {
-            if (uri)
-                soup_uri_free (uri);
-        }
+        /* if string is empty or starts with a '#', then ignore it */
+        if (s[0] == '\0' || s[0] == '#')
+            ;
+        /* otherwise try to append the URL to the end of the urls list */
+        else
+            ee_settings_insert_url (settings, s, -1);
+        g_free (s);
     }
 
     g_io_channel_unref (ioc);
@@ -149,6 +148,32 @@ ee_settings_new (void)
     g_free (path);
 
     return settings;
+}
+
+/*
+ * ee_settings_insert_url: insert a URL at the specified position.  if the
+ *   URL is not valid for HTTP, then returns FALSE, otherwise returns TRUE.
+ */
+gboolean
+ee_settings_insert_url (EESettings *settings, const gchar *url, gint position)
+{
+    gchar *s;
+    SoupURI *uri;
+
+    s = g_strstrip (g_strdup (url));
+    uri = soup_uri_new (s);
+    if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
+        gchar *id = soup_uri_to_string (uri, FALSE);
+        settings->urls = g_list_insert (settings->urls, uri, position);  
+        g_debug ("inserted URL %s at position %i", id, position);
+        g_free (s);
+        g_free (id);
+        return TRUE;
+    }
+    if (uri)
+        soup_uri_free (uri);
+    g_free (s);
+    return FALSE;
 }
 
 /*

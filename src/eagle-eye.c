@@ -49,6 +49,10 @@ main (int argc, char *argv[])
     /* load settings */
     settings = ee_settings_new ();
 
+    /* prepend URLs listed on the command line in reverse order */
+    for (argc--; argc > 0; argc--)
+        ee_settings_insert_url (settings, argv[argc], 0);
+
     /* create the main window */
     window = ee_main_window_construct (settings);
 

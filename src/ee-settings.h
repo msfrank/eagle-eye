@@ -14,6 +14,7 @@ typedef struct {
 } EESettings;
 
 EESettings *ee_settings_new (void);
+gboolean ee_settings_insert_url (EESettings *settings, const gchar *url, gint position);
 void ee_settings_free (EESettings *settings);
 
 #endif
