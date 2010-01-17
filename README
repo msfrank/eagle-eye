@@ -1,0 +1,42 @@
+Eagle Eye 0.0.1
+
+Introduction
+------------
+
+Eagle Eye cycles through a list of URLs, displaying them at
+regular intervals.  This is useful for monitoring a set of web
+pages, for example from network and system monitoring packages
+like Nagios.
+
+Requirements
+------------
+
+Eagle Eye depends on GTK+ 2.0, WebKit-GTK 1.0, and libsoup 2.4.
+WebKit-GTK in particular is a fast moving target; I've personally
+built Eagle Eye successfully using version 1.1.15, but earlier or
+later versions will likely work.
+
+If you're building from a cloned git repository instead of a
+packaged release tarball, then you will also need autoconf 2.59
+and automake 1.7.
+
+Installation
+------------
+
+Comprehensive installation instructions are detailed in the
+INSTALL file located in the top-level directory.  For a quick
+start:
+
+$ ./bootstrap.sh   (if building from git)
+$ ./configure
+$ make
+$ make install
+
+To remove Eagle Eye:
+
+$ make uninstall
+
+BUGS
+----
+
+Probably lots.
