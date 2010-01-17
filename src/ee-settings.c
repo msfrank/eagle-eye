@@ -2,6 +2,9 @@
 #include <libsoup/soup.h>
 #include <ee-settings.h>
 
+/*
+ * read_config_file: load configuration from $HOME/.eagle-eye/config.
+ */
 static void
 read_config_file (const gchar *path, EESettings *settings)
 {
@@ -56,6 +59,13 @@ read_config_file (const gchar *path, EESettings *settings)
     g_key_file_free (config);
 }
 
+/*
+ * read_urls_file: load URLs from $HOME/.eagle-eye/urls.  the format of
+ *   this file is one URL per line.  leading and trailing whitespace is
+ *   removed before parsing the URL.  username and password can be
+ *   specified using the normal URL syntax, and will be used for HTTP
+ *   authentication.
+ */
 static void
 read_urls_file (const gchar *path, EESettings *settings)
 {
@@ -102,6 +112,10 @@ read_urls_file (const gchar *path, EESettings *settings)
     g_io_channel_unref (ioc);
 }
 
+/*
+ * ee_settings_new: create a new settings object and populate it with data
+ *   from the $HOME/.eagle-eye/ configuration directory.
+ */
 EESettings *
 ee_settings_new (void)
 {
@@ -129,9 +143,17 @@ ee_settings_new (void)
     read_urls_file (path, settings);
     g_free (path);
 
+    /* open the cookie jar */
+    path = g_build_filename (home, ".eagle-eye", "cookies", NULL);
+    settings->cookie_jar = soup_cookie_jar_text_new (path, FALSE);
+    g_free (path);
+
     return settings;
 }
 
+/*
+ * ee_settings_free: free all memory associated with the settings object
+ */
 void
 ee_settings_free (EESettings *settings)
 {
@@ -143,6 +165,10 @@ ee_settings_free (EESettings *settings)
             soup_uri_free ((SoupURI *) curr->data);
         g_list_free (settings->urls);
     }
+
+    /* unref the cookie_jar */
+    if (settings->cookie_jar)
+        g_object_unref (settings->cookie_jar);
 
     g_free (settings);
 }

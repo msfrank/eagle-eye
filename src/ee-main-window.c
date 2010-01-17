@@ -302,6 +302,7 @@ ee_main_window_construct(EESettings *settings)
     g_signal_connect (private->session, "authenticate",
         G_CALLBACK (on_http_auth), private);
     soup_session_remove_feature_by_type (private->session, WEBKIT_TYPE_SOUP_AUTH_DIALOG);
+    soup_session_add_feature (private->session, SOUP_SESSION_FEATURE (settings->cookie_jar));
 
     /* put the webview in a scrolled window and put that in the vbox */
     sw = gtk_scrolled_window_new (NULL, NULL);
