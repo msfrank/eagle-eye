@@ -14,7 +14,10 @@ read_config_file (const gchar *path, EESettings *settings)
     gint window_x;
     gint window_y;
     gboolean start_fullscreen;
+    gboolean disable_plugins;
+    gboolean disable_scripts;
 
+    /* load configuration file */
     config = g_key_file_new ();
     g_key_file_load_from_file (config, path, 0, &error);
     if (error) {
@@ -54,6 +57,22 @@ read_config_file (const gchar *path, EESettings *settings)
         g_error_free (error);
     else
         settings->cycle_time = cycle_time;
+    error = NULL;
+
+    /* load disable-plugins parameter */
+    disable_plugins = g_key_file_get_boolean (config, "main", "disable-plugins", &error);
+    if (error)
+        g_error_free (error);
+    else
+        settings->disable_plugins = disable_plugins;
+    error = NULL;
+
+    /* load disable-scripts parameter */
+    disable_scripts = g_key_file_get_boolean (config, "main", "disable-scripts", &error);
+    if (error)
+        g_error_free (error);
+    else
+        settings->disable_scripts = disable_scripts;
     error = NULL;
 
     g_key_file_free (config);
@@ -129,6 +148,8 @@ ee_settings_new (void)
     settings->window_x = 800;
     settings->window_y = 600;
     settings->start_fullscreen = FALSE;
+    settings->disable_plugins = FALSE;
+    settings->disable_scripts = FALSE;
 
     home = g_get_home_dir ();
   

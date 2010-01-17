@@ -10,6 +10,8 @@ typedef struct {
     gint window_x;
     gint window_y;
     gboolean start_fullscreen;
+    gboolean disable_plugins;
+    gboolean disable_scripts;
     SoupCookieJar *cookie_jar;
 } EESettings;
 

@@ -257,6 +257,7 @@ ee_main_window_construct(EESettings *settings)
     GtkWindow *window;
     GtkWidget *vbox;
     GtkWidget *webview;
+    WebKitWebSettings *websettings;
     GtkWidget *sw;
     GtkWidget *toolbar;
     GtkToolItem *back;
@@ -297,6 +298,13 @@ ee_main_window_construct(EESettings *settings)
     g_signal_connect(WEBKIT_WEB_VIEW (webview), "title-changed",
         G_CALLBACK (on_title_changed), private);
 
+    /* configure the web settings object */
+    websettings = webkit_web_view_get_settings (private->webview);
+    if (settings->disable_plugins)
+        g_object_set (websettings, "enable-plugins", FALSE, NULL);
+    if (settings->disable_scripts)
+        g_object_set (websettings, "enable-scripts", FALSE, NULL);
+        
     /* configure the SoupSession */
     private->session = webkit_get_default_session ();
     g_signal_connect (private->session, "authenticate",
