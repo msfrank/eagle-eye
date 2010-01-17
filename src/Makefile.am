@@ -10,4 +10,5 @@ eagle_eye_LDADD = \
 eagle_eye_SOURCES = \
   eagle-eye.c \
   ee-main-window.c ee-main-window.h \
-  ee-settings.c ee-settings.h
+  ee-settings.c ee-settings.h \
+  ee-url-manager.c ee-url-manager.h

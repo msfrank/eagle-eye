@@ -2,6 +2,7 @@
 #include <webkit/webkit.h>
 #include <libsoup/soup.h>
 #include <ee-settings.h>
+#include <ee-url-manager.h>
 
 typedef struct {
     EESettings *settings;
@@ -246,7 +247,24 @@ on_toggled_fullscreen (GtkToggleToolButton *    button,
         g_debug ("---- FULLSCREEN OFF ----");
     }
 }
- 
+
+/*
+ * on_toggled_fullscreen: enable or disable fullscreen mode when the user
+ *   toggles the fullscreen button
+ */
+static void
+on_clicked_edit (GtkToolButton *        button,
+                 EEWindowPrivate *      private)
+{
+    GtkWidget *dialog;
+    gint result;
+
+    g_debug ("---- EDIT ----");
+    dialog = ee_url_manager_new (private->settings);
+    gtk_dialog_run (GTK_DIALOG (dialog));
+    gtk_widget_destroy (dialog);
+}
+
 /*
  * ee_main_window_construct: create the main window
  */
@@ -264,6 +282,7 @@ ee_main_window_construct(EESettings *settings)
     GtkToolItem *forward;
     GtkToolItem *pause;
     GtkToolItem *fullscreen;
+    GtkToolItem *edit;
     GtkWidget *status;
     GtkWidget *align;
     GtkToolItem *status_item;
@@ -352,6 +371,11 @@ ee_main_window_construct(EESettings *settings)
         G_CALLBACK (on_toggled_fullscreen), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), fullscreen, -1);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), gtk_separator_tool_item_new (), -1);
+    edit = gtk_tool_button_new_from_stock (GTK_STOCK_EDIT);
+    gtk_tool_item_set_tooltip_text (edit, "Edit URLs");
+    g_signal_connect (edit, "clicked",
+        G_CALLBACK (on_clicked_edit), private);
+    gtk_toolbar_insert (GTK_TOOLBAR (toolbar), edit, -1);
 
     /* create the status area and add it to the toolbar */
     status = gtk_label_new (NULL);
