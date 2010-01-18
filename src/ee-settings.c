@@ -123,7 +123,7 @@ read_urls_file (const gchar *path, EESettings *settings)
             ;
         /* otherwise try to append the URL to the end of the urls list */
         else
-            ee_settings_insert_url (settings, s, -1);
+            ee_settings_insert_url_from_string (settings, s, -1);
         g_free (s);
     }
 
@@ -176,25 +176,66 @@ ee_settings_new (void)
  *   URL is not valid for HTTP, then returns FALSE, otherwise returns TRUE.
  */
 gboolean
-ee_settings_insert_url (EESettings *settings, const gchar *url, gint position)
+ee_settings_insert_url (EESettings *settings, SoupURI *url, gint position)
 {
-    gchar *s;
-    SoupURI *uri;
+    SoupURI *copy;
+    gchar *id;
 
-    s = g_strstrip (g_strdup (url));
-    uri = soup_uri_new (s);
-    if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
-        gchar *id = soup_uri_to_string (uri, FALSE);
-        settings->urls = g_list_insert (settings->urls, uri, position);  
-        g_debug ("inserted URL %s at position %i", id, position);
-        g_free (s);
+    g_assert (settings != NULL);
+    g_assert (url != NULL);
+
+    if (!SOUP_URI_VALID_FOR_HTTP (url)) {
+        id = soup_uri_to_string (url, FALSE);
+        g_warning ("failed to insert URL %s: not a valid HTTP URL", id);
         g_free (id);
-        return TRUE;
+        return FALSE;
     }
-    if (uri)
-        soup_uri_free (uri);
-    g_free (s);
-    return FALSE;
+    copy = soup_uri_copy (url);
+    id = soup_uri_to_string (copy, FALSE);
+    settings->urls = g_list_insert (settings->urls, copy, position);  
+    g_debug ("inserted URL %s at position %i", id, position);
+    g_free (id);
+    return TRUE;
+}
+
+/*
+ * ee_settings_insert_url_from_string: insert a URL at the specified 
+ *   position.  if the URL is not valid for HTTP, then returns FALSE,
+ *   otherwise returns TRUE.
+ */
+gboolean
+ee_settings_insert_url_from_string (EESettings *settings, const gchar *url, gint position)
+{
+    SoupURI *u;
+    gboolean retval = FALSE;
+
+    g_assert (settings != NULL);
+    g_assert (url != NULL);
+
+    u = soup_uri_new (url);
+    if (u != NULL) {
+        retval = ee_settings_insert_url (settings, u, position);
+        soup_uri_free (u);
+    }
+    else
+        g_warning ("failed to insert URL %s: couldn't parse URL", url);
+    return retval;
+}
+
+/*
+ * ee_settings_remove_url:
+ */
+gboolean
+ee_settings_remove_url (EESettings *settings, guint index)
+{
+    GList *item;
+
+    item = g_list_nth (settings->urls, index);
+    if (item == NULL)
+        return FALSE;
+    soup_uri_free ((SoupURI *) item->data);
+    settings->urls = g_list_delete_link (settings->urls, item);
+    return TRUE;
 }
 
 /*
