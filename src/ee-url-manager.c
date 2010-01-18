@@ -6,7 +6,7 @@
 enum { URL_COLUMN, USER_COLUMN, PASSWORD_COLUMN, N_COLUMNS };
 
 /*
- *
+ * 
  */
 static void
 on_row_inserted (GtkTreeModel *         model,
@@ -26,9 +26,9 @@ on_row_inserted (GtkTreeModel *         model,
     uri = soup_uri_new (url);
     soup_uri_set_user (uri, username);
     soup_uri_set_password (uri, password);
-    ee_settings_insert_url (settings, uri, indices[0]);
+    if (ee_settings_insert_url (settings, uri, indices[0]))
+        g_debug ("inserted row at position %i", indices[0]);
     soup_uri_free (uri);
-    g_debug ("inserted row at position %i", indices[0]);
 }
 
 /*
@@ -149,7 +149,7 @@ ee_url_manager_new (EESettings *settings)
      * the store with initial data, otherwise the on_row_inserted callback
      * will be called for each row.
      */
-    g_signal_connect (store, "row-inserted",
+    g_signal_connect (store, "row-changed",
         G_CALLBACK (on_row_inserted), settings);
     g_signal_connect (store, "row-deleted",
         G_CALLBACK (on_row_deleted), settings);
