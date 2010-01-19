@@ -24,7 +24,9 @@ on_row_inserted (GtkTreeModel *         model,
     gtk_tree_model_get (model, iter, URL_COLUMN, &url,
         USER_COLUMN, &username, PASSWORD_COLUMN, &password, -1);
     uri = soup_uri_new (url);
-    soup_uri_set_user (uri, username);
+    if (username && username[0] != '\0')
+        soup_uri_set_user (uri, username);
+    if (password && password[0] != '\0')
     soup_uri_set_password (uri, password);
     if (ee_settings_insert_url (settings, uri, indices[0]))
         g_debug ("inserted row at position %i", indices[0]);
@@ -64,7 +66,9 @@ on_clicked_add (GtkToolButton *         button,
     GtkWidget *align;
     GtkWidget *table;
     GtkWidget *label;
-    GtkWidget *entry;
+    GtkWidget *url_entry;
+    GtkWidget *user_entry;
+    GtkWidget *pass_entry;
 
     g_debug ("---- ADD URL ----");
 
@@ -87,37 +91,69 @@ on_clicked_add (GtkToolButton *         button,
     gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
     gtk_table_attach (GTK_TABLE (table), label, 0, 1, 0, 1,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
-    entry = gtk_entry_new ();
-    gtk_entry_set_width_chars (GTK_ENTRY (entry), 40);
-    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 0, 1,
+    url_entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (url_entry), 40);
+    gtk_table_attach (GTK_TABLE (table), url_entry, 1, 2, 0, 1,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
-    /* add the URL label and entry box */
+    /* add the Username label and entry box */
     label = gtk_label_new (NULL);
     gtk_label_set_markup (GTK_LABEL (label), "<b>Username</b> (optional)");
     gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
     gtk_table_attach (GTK_TABLE (table), label, 0, 1, 1, 2,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
-    entry = gtk_entry_new ();
-    gtk_entry_set_width_chars (GTK_ENTRY (entry), 32);
-    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 1, 2,
+    user_entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (user_entry), 32);
+    gtk_table_attach (GTK_TABLE (table), user_entry, 1, 2, 1, 2,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
-    /* add the URL label and entry box */
+    /* add the Password label and entry box */
     label = gtk_label_new (NULL);
     gtk_label_set_markup (GTK_LABEL (label), "<b>Password</b> (optional)");
     gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
     gtk_table_attach (GTK_TABLE (table), label, 0, 1, 2, 3,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
-    entry = gtk_entry_new ();
-    gtk_entry_set_width_chars (GTK_ENTRY (entry), 32);
-    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 2, 3,
+    pass_entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (pass_entry), 32);
+    gtk_entry_set_visibility (GTK_ENTRY (pass_entry), FALSE);
+    gtk_table_attach (GTK_TABLE (table), pass_entry, 1, 2, 2, 3,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
+    /* run the dialog */
     gtk_widget_show_all (dialog);
-    gtk_dialog_run (GTK_DIALOG (dialog));
+    if (gtk_dialog_run (GTK_DIALOG (dialog)) == GTK_RESPONSE_OK) {
+        const gchar *url = gtk_entry_get_text (GTK_ENTRY (url_entry));
+        const gchar *user = gtk_entry_get_text (GTK_ENTRY (user_entry));
+        const gchar *pass = gtk_entry_get_text (GTK_ENTRY (pass_entry));
+        SoupURI *uri;
+
+        uri = soup_uri_new (url);
+        if (uri && SOUP_URI_VALID_FOR_HTTP (uri)) {
+            GtkTreeModel *model;
+            GtkTreeIter iter;
+
+            if (user && user[0] != '\0')
+                soup_uri_set_user (uri, user);
+            if (pass && pass[0] != '\0')
+                soup_uri_set_password (uri, pass);
+            model = gtk_tree_view_get_model (tree_view);
+            gtk_list_store_append (GTK_LIST_STORE (model), &iter);
+            gtk_list_store_set (GTK_LIST_STORE (model), &iter, URL_COLUMN, url,
+                USER_COLUMN, user, PASSWORD_COLUMN, pass, -1);
+            soup_uri_free (uri);
+        }
+        else {
+            GtkWidget *alert;
+    
+            alert = gtk_message_dialog_new (NULL, GTK_DIALOG_DESTROY_WITH_PARENT,
+                GTK_MESSAGE_ERROR, GTK_BUTTONS_CLOSE, "Failed to add URL: URL is invalid");
+            gtk_dialog_run (GTK_DIALOG (alert));
+            gtk_widget_destroy (alert);
+        }
+    }
+
     gtk_widget_destroy (dialog);
- }
+}
 
 /*
  *
