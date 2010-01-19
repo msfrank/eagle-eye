@@ -37,7 +37,8 @@ main (int argc, char *argv[])
     gtk_init (&argc, &argv);
 
     /* parse command line arguments */
-    ct = g_option_context_new ("- iterate through web pages at regular intervals");
+    ct = g_option_context_new ("[URL...]");
+    g_option_context_set_summary (ct, "Iterate through web pages at regular intervals");
     g_option_context_add_group (ct, gtk_get_option_group (TRUE));
     g_option_context_add_main_entries (ct, entries, NULL);
     if (!g_option_context_parse (ct, &argc, &argv, &error)) {

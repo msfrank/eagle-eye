@@ -60,8 +60,64 @@ static void
 on_clicked_add (GtkToolButton *         button,
                 GtkTreeView *           tree_view)
 {
+    GtkWidget *dialog;
+    GtkWidget *align;
+    GtkWidget *table;
+    GtkWidget *label;
+    GtkWidget *entry;
+
     g_debug ("---- ADD URL ----");
-}
+
+    /* create the toplevel dialog window */
+    dialog = gtk_dialog_new_with_buttons ("Add a new URL ...",
+        NULL, GTK_DIALOG_DESTROY_WITH_PARENT, GTK_STOCK_CANCEL,
+        GTK_RESPONSE_CANCEL, GTK_STOCK_OK, GTK_RESPONSE_OK, NULL);
+
+    /* create 12px padding */
+    align = gtk_alignment_new (0.5, 0.5, 1.0, 1.0);
+    gtk_alignment_set_padding (GTK_ALIGNMENT (align), 12, 12, 12, 12);
+    gtk_box_pack_start (GTK_BOX (GTK_DIALOG(dialog)->vbox), align, TRUE, TRUE, 0);
+
+    table = gtk_table_new (3, 2, FALSE);
+    gtk_container_add (GTK_CONTAINER (align), table);
+
+    /* add the URL label and entry box */
+    label = gtk_label_new (NULL);
+    gtk_label_set_markup (GTK_LABEL (label), "<b>URL</b>");
+    gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+    gtk_table_attach (GTK_TABLE (table), label, 0, 1, 0, 1,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+    entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (entry), 40);
+    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 0, 1,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+
+    /* add the URL label and entry box */
+    label = gtk_label_new (NULL);
+    gtk_label_set_markup (GTK_LABEL (label), "<b>Username</b> (optional)");
+    gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+    gtk_table_attach (GTK_TABLE (table), label, 0, 1, 1, 2,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+    entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (entry), 32);
+    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 1, 2,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+
+    /* add the URL label and entry box */
+    label = gtk_label_new (NULL);
+    gtk_label_set_markup (GTK_LABEL (label), "<b>Password</b> (optional)");
+    gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
+    gtk_table_attach (GTK_TABLE (table), label, 0, 1, 2, 3,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+    entry = gtk_entry_new ();
+    gtk_entry_set_width_chars (GTK_ENTRY (entry), 32);
+    gtk_table_attach (GTK_TABLE (table), entry, 1, 2, 2, 3,
+        GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
+
+    gtk_widget_show_all (dialog);
+    gtk_dialog_run (GTK_DIALOG (dialog));
+    gtk_widget_destroy (dialog);
+ }
 
 /*
  *
