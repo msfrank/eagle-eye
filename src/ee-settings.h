@@ -12,6 +12,7 @@ typedef struct {
     gboolean start_fullscreen;
     gboolean disable_plugins;
     gboolean disable_scripts;
+    guint toolbar_size;
     SoupCookieJar *cookie_jar;
 } EESettings;
 

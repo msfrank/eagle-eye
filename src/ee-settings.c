@@ -16,6 +16,7 @@ read_config_file (const gchar *path, EESettings *settings)
     gboolean start_fullscreen;
     gboolean disable_plugins;
     gboolean disable_scripts;
+    gint toolbar_size;
 
     /* load configuration file */
     config = g_key_file_new ();
@@ -29,51 +30,82 @@ read_config_file (const gchar *path, EESettings *settings)
 
     /* load start-fullscreen parameter */
     start_fullscreen = g_key_file_get_boolean (config, "main", "start-fullscreen", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::start-fullscreen");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->start_fullscreen = start_fullscreen;
-    error = NULL;
 
     /* load window-x parameter */
     window_x = g_key_file_get_integer (config, "main", "window-x", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::window-x");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->window_x = window_x;
-    error = NULL;
 
     /* load window-y parameter */
     window_y = g_key_file_get_integer (config, "main", "window-y", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::window-y");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->window_y = window_y;
-    error = NULL;
 
     /* load cycle-time parameter */
     cycle_time = g_key_file_get_integer (config, "main", "cycle-time", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::cycle-time");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->cycle_time = cycle_time;
-    error = NULL;
 
     /* load disable-plugins parameter */
     disable_plugins = g_key_file_get_boolean (config, "main", "disable-plugins", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::disable-plugins");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->disable_plugins = disable_plugins;
-    error = NULL;
 
     /* load disable-scripts parameter */
     disable_scripts = g_key_file_get_boolean (config, "main", "disable-scripts", &error);
-    if (error)
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::disable-scripts");
         g_error_free (error);
+        error = NULL;
+    }
     else
         settings->disable_scripts = disable_scripts;
-    error = NULL;
+
+    /* load window-y parameter */
+    toolbar_size = g_key_file_get_integer (config, "main", "toolbar-size", &error);
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::toolbar-size");
+        g_error_free (error);
+        error = NULL;
+    }
+    else if (toolbar_size < 0)
+        g_warning ("configuration error: value for main::toolbar-size is < 0");
+    else
+        settings->toolbar_size = (guint) toolbar_size;
 
     g_key_file_free (config);
 }
@@ -150,6 +182,7 @@ ee_settings_new (void)
     settings->start_fullscreen = FALSE;
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
+    settings->toolbar_size = 3;
 
     home = g_get_home_dir ();
   

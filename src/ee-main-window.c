@@ -344,6 +344,7 @@ ee_main_window_construct(EESettings *settings)
     /* create the toolbar */
     toolbar = gtk_toolbar_new ();
     gtk_box_pack_start(GTK_BOX (vbox), toolbar, FALSE, FALSE, 0);
+    g_object_set (toolbar, "icon-size", settings->toolbar_size, NULL);
 
     /* add the toolbar items */
     back = gtk_tool_button_new_from_stock (GTK_STOCK_MEDIA_PREVIOUS);
