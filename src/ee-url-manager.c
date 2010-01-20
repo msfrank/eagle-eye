@@ -76,6 +76,7 @@ on_clicked_add (GtkToolButton *         button,
     dialog = gtk_dialog_new_with_buttons ("Add a new URL ...",
         NULL, GTK_DIALOG_DESTROY_WITH_PARENT, GTK_STOCK_CANCEL,
         GTK_RESPONSE_CANCEL, GTK_STOCK_OK, GTK_RESPONSE_OK, NULL);
+    gtk_dialog_set_default_response (GTK_DIALOG (dialog), GTK_RESPONSE_OK);
 
     /* create 12px padding */
     align = gtk_alignment_new (0.5, 0.5, 1.0, 1.0);
@@ -93,6 +94,7 @@ on_clicked_add (GtkToolButton *         button,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
     url_entry = gtk_entry_new ();
     gtk_entry_set_width_chars (GTK_ENTRY (url_entry), 40);
+    gtk_entry_set_activates_default (GTK_ENTRY (url_entry), TRUE);
     gtk_table_attach (GTK_TABLE (table), url_entry, 1, 2, 0, 1,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
@@ -104,6 +106,7 @@ on_clicked_add (GtkToolButton *         button,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
     user_entry = gtk_entry_new ();
     gtk_entry_set_width_chars (GTK_ENTRY (user_entry), 32);
+    gtk_entry_set_activates_default (GTK_ENTRY (user_entry), TRUE);
     gtk_table_attach (GTK_TABLE (table), user_entry, 1, 2, 1, 2,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
@@ -116,6 +119,7 @@ on_clicked_add (GtkToolButton *         button,
     pass_entry = gtk_entry_new ();
     gtk_entry_set_width_chars (GTK_ENTRY (pass_entry), 32);
     gtk_entry_set_visibility (GTK_ENTRY (pass_entry), FALSE);
+    gtk_entry_set_activates_default (GTK_ENTRY (pass_entry), TRUE);
     gtk_table_attach (GTK_TABLE (table), pass_entry, 1, 2, 2, 3,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
