@@ -2,6 +2,7 @@
 #include <webkit/webkit.h>
 #include <libsoup/soup.h>
 #include <ee-settings.h>
+#include <ee-prefs-dialog.h>
 #include <ee-url-manager.h>
 
 typedef struct {
@@ -249,8 +250,7 @@ on_toggled_fullscreen (GtkToggleToolButton *    button,
 }
 
 /*
- * on_toggled_fullscreen: enable or disable fullscreen mode when the user
- *   toggles the fullscreen button
+ * on_clicked_edit: display the URL manager
  */
 static void
 on_clicked_edit (GtkToolButton *        button,
@@ -263,6 +263,45 @@ on_clicked_edit (GtkToolButton *        button,
     dialog = ee_url_manager_new (private->settings);
     gtk_dialog_run (GTK_DIALOG (dialog));
     gtk_widget_destroy (dialog);
+}
+
+/*
+ * on_clicked_prefs: display the preferences
+ */
+static void
+on_clicked_prefs (GtkToolButton *       button,
+                  EEWindowPrivate *     private)
+{
+    GtkWidget *dialog;
+
+    g_debug ("---- PREFERENCES ----");
+    ee_prefs_dialog_run (private->settings);
+}
+
+/*
+ *
+ */
+static void
+on_add_url (GtkMenuItem *               menu_item,
+            EESettings *                settings)
+{
+    g_debug ("---- POPUP ADD URL ----");
+}
+
+/*
+ *
+ */
+static void
+on_populate_popup (WebKitWebView *      webview,
+                   GtkMenu *            menu,
+                   EESettings *         settings)
+{
+    GtkWidget *add_item;
+    gtk_menu_shell_prepend (GTK_MENU_SHELL (menu), gtk_separator_menu_item_new ());
+    add_item = gtk_menu_item_new_with_label ("Add URL...");
+    g_signal_connect (add_item, "activate", G_CALLBACK (on_add_url), settings);
+    gtk_menu_shell_prepend (GTK_MENU_SHELL (menu), add_item);
+    gtk_widget_show_all (GTK_WIDGET (menu));
 }
 
 /*
@@ -283,6 +322,7 @@ ee_main_window_construct(EESettings *settings)
     GtkToolItem *pause;
     GtkToolItem *fullscreen;
     GtkToolItem *edit;
+    GtkToolItem *prefs;
     GtkWidget *status;
     GtkWidget *align;
     GtkToolItem *status_item;
@@ -316,6 +356,8 @@ ee_main_window_construct(EESettings *settings)
         G_CALLBACK (on_load_finished), private);
     g_signal_connect(WEBKIT_WEB_VIEW (webview), "title-changed",
         G_CALLBACK (on_title_changed), private);
+    g_signal_connect(WEBKIT_WEB_VIEW (webview), "populate-popup",
+        G_CALLBACK (on_populate_popup), private);
 
     /* configure the web settings object */
     websettings = webkit_web_view_get_settings (private->webview);
@@ -377,6 +419,11 @@ ee_main_window_construct(EESettings *settings)
     g_signal_connect (edit, "clicked",
         G_CALLBACK (on_clicked_edit), private);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), edit, -1);
+    prefs = gtk_tool_button_new_from_stock (GTK_STOCK_PREFERENCES);
+    gtk_tool_item_set_tooltip_text (edit, "Preferences");
+    g_signal_connect (prefs, "clicked",
+        G_CALLBACK (on_clicked_prefs), private);
+    gtk_toolbar_insert (GTK_TOOLBAR (toolbar), prefs, -1);
 
     /* create the status area and add it to the toolbar */
     status = gtk_label_new (NULL);
@@ -391,9 +438,11 @@ ee_main_window_construct(EESettings *settings)
 
     gtk_widget_show_all (GTK_WIDGET (window));
 
-    /* if start-fullscreen is true, then make the window fullscreen */
-    if (settings->start_fullscreen == TRUE)
+    /* if enabled, make the window fullscreen and toggle the fullscreen button */
+    if (settings->start_fullscreen == TRUE) {
+        gtk_toggle_tool_button_set_active (GTK_TOGGLE_TOOL_BUTTON (fullscreen), TRUE);
         gtk_window_fullscreen (window);
+    }
 
     /* load the first URL */
     load_url (private);
