@@ -14,6 +14,8 @@ AC_PROG_MAKE_SET
 # Checks for libraries.
 PKG_CHECK_MODULES(webkit, [webkit-1.0],,
                   [AC_MSG_FAILURE([$webkit_PKG_ERRORS])])
+PKG_CHECK_MODULES(libsoup, [libsoup-2.4],,
+                  [AC_MSG_FAILURE([$libsoup_PKG_ERRORS])])
 PKG_CHECK_MODULES(gtk, [gtk+-2.0],,
                   [AC_MSG_FAILURE([$gtk_PKG_ERRORS])])
 PKG_CHECK_MODULES(glib, [glib-2.0 gthread-2.0 gmodule-2.0],,

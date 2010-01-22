@@ -2,10 +2,12 @@ bin_PROGRAMS = eagle-eye
 eagle_eye_CFLAGS = \
  $(glib_CFLAGS) \
  $(gtk_CFLAGS) \
+ $(libsoup_CFLAGS) \
  $(webkit_CFLAGS)
 eagle_eye_LDADD = \
  $(glib_LIBS) \
  $(gtk_LIBS) \
+ $(libsoup_LIBS) \
  $(webkit_LIBS)
 eagle_eye_SOURCES = \
   eagle-eye.c \
