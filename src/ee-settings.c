@@ -1,12 +1,15 @@
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
 #include <glib.h>
 #include <libsoup/soup.h>
 #include <ee-settings.h>
 
 /*
- * read_config_file: load configuration from $HOME/.eagle-eye/config.
+ * read_config_file: load configuration from settings->config_file.
  */
 static void
-read_config_file (const gchar *path, EESettings *settings)
+read_config_file (EESettings *settings)
 {
     GKeyFile *config;
     GError *error = NULL;
@@ -17,16 +20,18 @@ read_config_file (const gchar *path, EESettings *settings)
     gboolean disable_plugins;
     gboolean disable_scripts;
     gint toolbar_size;
+    gchar *cookies_file;
 
     /* load configuration file */
     config = g_key_file_new ();
-    g_key_file_load_from_file (config, path, 0, &error);
+    g_key_file_load_from_file (config, settings->config_file, 0, &error);
     if (error) {
-        g_warning ("failed to open %s: %s", path, error->message);
+        g_warning ("failed to open %s: %s", settings->config_file, error->message);
         g_error_free (error);
         g_key_file_free (config);
         return;
     }
+    g_debug ("loading configuration from %s", settings->config_file);
 
     /* load start-fullscreen parameter */
     start_fullscreen = g_key_file_get_boolean (config, "main", "start-fullscreen", &error);
@@ -94,7 +99,7 @@ read_config_file (const gchar *path, EESettings *settings)
     else
         settings->disable_scripts = disable_scripts;
 
-    /* load window-y parameter */
+    /* load toolbar-size parameter */
     toolbar_size = g_key_file_get_integer (config, "main", "toolbar-size", &error);
     if (error) {
         if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
@@ -107,18 +112,29 @@ read_config_file (const gchar *path, EESettings *settings)
     else
         settings->toolbar_size = (guint) toolbar_size;
 
+    /* load cookies-file parameter */
+    cookies_file = g_key_file_get_string (config, "main", "cookies-file", &error);
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::cookies-file");
+        g_error_free (error);
+        error = NULL;
+    }
+    else
+        settings->cookies_file = cookies_file;
+
     g_key_file_free (config);
 }
 
 /*
- * read_urls_file: load URLs from $HOME/.eagle-eye/urls.  the format of
+ * read_urls_file: load URLs from settings->urls_file.  the format of
  *   this file is one URL per line.  leading and trailing whitespace is
  *   removed before parsing the URL.  username and password can be
  *   specified using the normal URL syntax, and will be used for HTTP
  *   authentication.
  */
 static void
-read_urls_file (const gchar *path, EESettings *settings)
+read_urls_file (EESettings *settings)
 {
     GIOChannel *ioc;
     GError *error = NULL;
@@ -127,14 +143,15 @@ read_urls_file (const gchar *path, EESettings *settings)
     gsize len;
     
     /* try to open the urls file */
-    ioc = g_io_channel_new_file (path, "r", &error);
+    ioc = g_io_channel_new_file (settings->urls_file, "r", &error);
     if (error) {
-        g_warning ("failed to open %s: %s", path, error->message);
+        g_warning ("failed to open %s: %s", settings->urls_file, error->message);
         g_error_free (error);
         if (ioc)
             g_io_channel_unref (ioc);
         return;
     }
+    g_debug ("loading URLs from %s", settings->urls_file);
 
     /* loop reading each line of the file */
     while (1) {
@@ -163,15 +180,16 @@ read_urls_file (const gchar *path, EESettings *settings)
 }
 
 /*
- * ee_settings_new: create a new settings object and populate it with data
- *   from the $HOME/.eagle-eye/ configuration directory.
+ * ee_settings_new: create and load a new settings object.  configuration 
+ *   data will be loaded from config_file and urls_file if they are specified,
+ *   otherwise the data will be retrieved from $HOME/.eagle-eye/config and
+ *   $HOME/.eagle-eye/urls, respectively.
  */
 EESettings *
-ee_settings_new (void)
+ee_settings_new (const gchar *config_file, const gchar *urls_file)
 {
     EESettings *settings;
-    const gchar *home;
-    gchar *path;
+    gchar *home;
 
     /* alloc the settings object and set some defaults */
     settings = g_new0 (EESettings, 1);
@@ -183,23 +201,40 @@ ee_settings_new (void)
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
     settings->toolbar_size = 3;
+    settings->config_file = NULL;
+    settings->urls_file = NULL;
+    settings->cookies_file = NULL;
 
-    home = g_get_home_dir ();
+    home = g_build_filename (g_get_home_dir (), ".eagle-eye", NULL);
+
+    /* create $HOME/.eagle-eye if it doesn't exist */
+    if (mkdir (home, 0755) < 0 && errno != EEXIST) {
+        g_warning ("failed to create %s: %s", home, g_strerror (errno));
+        g_free (home);
+        home = NULL;
+    }
   
     /* load config parameters */
-    path = g_build_filename (home, ".eagle-eye", "config", NULL);
-    read_config_file (path, settings);
-    g_free (path);
+    if (config_file)
+        settings->config_file = g_strdup (config_file);
+    if (settings->config_file == NULL && home)
+        settings->config_file = g_build_filename (home, "config", NULL);
+    read_config_file (settings);
 
     /* load the urls file */
-    path = g_build_filename (home, ".eagle-eye", "urls", NULL);
-    read_urls_file (path, settings);
-    g_free (path);
+    if (urls_file)
+        settings->urls_file = g_strdup (urls_file);
+    if (settings->urls_file == NULL && home)
+        settings->urls_file = g_build_filename (home, "urls", NULL);
+    read_urls_file (settings);
 
     /* open the cookie jar */
-    path = g_build_filename (home, ".eagle-eye", "cookies", NULL);
-    settings->cookie_jar = soup_cookie_jar_text_new (path, FALSE);
-    g_free (path);
+    if (settings->cookies_file == NULL && home)
+        settings->cookies_file = g_build_filename (home, "cookies", NULL);
+    if (settings->cookies_file)
+        settings->cookie_jar = soup_cookie_jar_text_new (settings->cookies_file, FALSE);
+
+    g_free (home);
 
     return settings;
 }

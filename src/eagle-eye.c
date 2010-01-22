@@ -16,8 +16,13 @@ on_parse_version_option (const gchar *      name,
     return TRUE;
 }
 
+static gchar *config_file = NULL;
+static gchar *urls_file = NULL;
+
 static GOptionEntry entries[] = 
 {
+    { "config", 'c', 0, G_OPTION_ARG_FILENAME, &config_file, "Use specified configuration file", "PATH" },
+    { "urls", 'u', 0, G_OPTION_ARG_FILENAME, &urls_file, "Use specified urls file", "PATH" },
     { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, on_parse_version_option, "Display program version", NULL },
     { NULL }
 };
@@ -48,7 +53,7 @@ main (int argc, char *argv[])
     g_option_context_free (ct);
 
     /* load settings */
-    settings = ee_settings_new ();
+    settings = ee_settings_new (config_file, urls_file);
 
     /* prepend URLs listed on the command line in reverse order */
     for (argc--; argc > 0; argc--)

@@ -19,5 +19,5 @@ PKG_CHECK_MODULES(gtk, [gtk+-2.0],,
 PKG_CHECK_MODULES(glib, [glib-2.0 gthread-2.0 gmodule-2.0],,
                   [AC_MSG_FAILURE([$gthread_PKG_ERRORS])])
 
-AC_CONFIG_FILES([Makefile src/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile eagle-eye.desktop])
 AC_OUTPUT

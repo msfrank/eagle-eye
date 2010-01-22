@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=@VERSION@
+Name=Eagle Eye
+GenericName=Web Page Monitor
+Comment=Iterate through web pages automatically
+Exec=eagle-eye
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Application;Network;
