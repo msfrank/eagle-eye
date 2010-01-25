@@ -1,5 +1,5 @@
 AC_PREREQ(2.59)
-AC_INIT([eagle-eye], [0.0.1],
+AC_INIT([eagle-eye], [0.0.2],
         [http://www.livemocha.com],
         [eagle-eye])
 
