@@ -180,13 +180,13 @@ read_urls_file (EESettings *settings)
 }
 
 /*
- * ee_settings_new: create and load a new settings object.  configuration 
+ * ee_settings_open: create and load a new settings object.  configuration 
  *   data will be loaded from config_file and urls_file if they are specified,
  *   otherwise the data will be retrieved from $HOME/.eagle-eye/config and
  *   $HOME/.eagle-eye/urls, respectively.
  */
 EESettings *
-ee_settings_new (const gchar *config_file, const gchar *urls_file)
+ee_settings_open (const gchar *config_file, const gchar *urls_file)
 {
     EESettings *settings;
     gchar *home;
@@ -307,10 +307,10 @@ ee_settings_remove_url (EESettings *settings, guint index)
 }
 
 /*
- * ee_settings_free: free all memory associated with the settings object
+ * ee_settings_close: free all memory associated with the settings object
  */
 void
-ee_settings_free (EESettings *settings)
+ee_settings_close (EESettings *settings)
 {
     GList *curr;
 

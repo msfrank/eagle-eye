@@ -19,10 +19,10 @@ typedef struct {
     SoupCookieJar *cookie_jar;
 } EESettings;
 
-EESettings *ee_settings_new (const gchar *config_file, const gchar *urls_file);
+EESettings *ee_settings_open (const gchar *config_file, const gchar *urls_file);
 gboolean ee_settings_insert_url (EESettings *settings, SoupURI *url, gint position);
 gboolean ee_settings_insert_url_from_string (EESettings *settings, const gchar *url, gint position);
 gboolean ee_settings_remove_url (EESettings *settings, guint index);
-void ee_settings_free (EESettings *settings);
+void ee_settings_close (EESettings *settings);
 
 #endif

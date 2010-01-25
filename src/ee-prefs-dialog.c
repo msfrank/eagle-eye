@@ -1,12 +1,49 @@
 #include <glib.h>
 #include <gtk/gtk.h>
+#include <ee-main-window.h>
 #include <ee-settings.h>
+
+void
+on_cycle_time_changed (GtkSpinButton *      button,
+                       EEMainWindow *       mainwin)
+{
+    mainwin->settings->cycle_time =
+        (gint) gtk_spin_button_get_value (GTK_SPIN_BUTTON (button));
+}
+
+void
+on_start_fullscreen (GtkToggleButton *      button,
+                     EEMainWindow *         mainwin)
+{
+    mainwin->settings->start_fullscreen = 
+        gtk_toggle_button_get_active (button);
+}
+
+void
+on_disable_plugins (GtkToggleButton *       button,
+                    EEMainWindow *          mainwin)
+{
+    gboolean disable_plugins = gtk_toggle_button_get_active (button);
+    WebKitWebSettings *websettings = webkit_web_view_get_settings (mainwin->webview);
+    mainwin->settings->disable_plugins = disable_plugins;
+    g_object_set (websettings, "enable-plugins", !disable_plugins, NULL);
+}
+
+void
+on_disable_scripts (GtkToggleButton *       button,
+                    EEMainWindow *          mainwin)
+{
+    gboolean disable_scripts = gtk_toggle_button_get_active (button);
+    WebKitWebSettings *websettings = webkit_web_view_get_settings (mainwin->webview);
+    mainwin->settings->disable_scripts = disable_scripts;
+    g_object_set (websettings, "enable-scripts", !disable_scripts, NULL);
+}
 
 /*
  *
  */
 void
-ee_prefs_dialog_run (EESettings *settings)
+ee_prefs_dialog_run (EEMainWindow *mainwin)
 {
     GtkWidget *dialog;
     GtkWidget *align;
@@ -36,29 +73,38 @@ ee_prefs_dialog_run (EESettings *settings)
     gtk_misc_set_alignment (GTK_MISC (label), 0.0, 0.5);
     gtk_table_attach (GTK_TABLE (table), label, 0, 1, 0, 1,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
-    cycle_time = gtk_spin_button_new_with_range (1.0, 86400.0, 10.0);
-    gtk_spin_button_set_value (GTK_SPIN_BUTTON (cycle_time), (gdouble) settings->cycle_time);
+    cycle_time = gtk_spin_button_new_with_range (10.0, 86400.0, 10.0);
+    gtk_spin_button_set_value (GTK_SPIN_BUTTON (cycle_time),
+        (gdouble) mainwin->settings->cycle_time);
+    g_signal_connect (cycle_time, "value-changed",
+        G_CALLBACK (on_cycle_time_changed), mainwin);
     gtk_table_attach (GTK_TABLE (table), cycle_time, 1, 2, 0, 1,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
     /* add the start-fullscreen checkbox */
     start_fullscreen = gtk_check_button_new_with_label ("Start in fullscreen mode");
-    if (settings->start_fullscreen)
+    if (mainwin->settings->start_fullscreen)
         gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (start_fullscreen), TRUE);
+    g_signal_connect (start_fullscreen, "toggled",
+        G_CALLBACK (on_start_fullscreen), mainwin);
     gtk_table_attach (GTK_TABLE (table), start_fullscreen, 0, 2, 1, 2,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
     /* add the disable-plugins checkbox */
     disable_plugins = gtk_check_button_new_with_label ("Disable browser plugins");
-    if (settings->disable_plugins)
+    if (mainwin->settings->disable_plugins)
         gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (disable_plugins), TRUE);
+    g_signal_connect (disable_plugins, "toggled",
+        G_CALLBACK (on_disable_plugins), mainwin);
     gtk_table_attach (GTK_TABLE (table), disable_plugins, 0, 2, 2, 3,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 
     /* add the disable-scripts checkbox */
-    disable_scripts = gtk_check_button_new_with_label ("Disable browser plugins");
-    if (settings->disable_scripts)
+    disable_scripts = gtk_check_button_new_with_label ("Disable browser scripts");
+    if (mainwin->settings->disable_scripts)
         gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (disable_scripts), TRUE);
+    g_signal_connect (disable_scripts, "toggled",
+        G_CALLBACK (on_disable_scripts), mainwin);
     gtk_table_attach (GTK_TABLE (table), disable_scripts, 0, 2, 3, 4,
         GTK_EXPAND | GTK_FILL, GTK_SHRINK, 6, 2);
 

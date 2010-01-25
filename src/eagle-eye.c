@@ -53,7 +53,7 @@ main (int argc, char *argv[])
     g_option_context_free (ct);
 
     /* load settings */
-    settings = ee_settings_new (config_file, urls_file);
+    settings = ee_settings_open (config_file, urls_file);
 
     /* prepend URLs listed on the command line in reverse order */
     for (argc--; argc > 0; argc--)
@@ -65,7 +65,7 @@ main (int argc, char *argv[])
     /* hand control over to gtk main loop */
     gtk_main ();
 
-    ee_settings_free (settings);
+    ee_settings_close (settings);
 
     return 0;
 }
