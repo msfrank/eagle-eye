@@ -1,3 +1,4 @@
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
@@ -127,6 +128,70 @@ read_config_file (EESettings *settings)
 }
 
 /*
+ * write_config_file: write configuration to settings->config_file.
+ */
+static void
+write_config_file (EESettings *settings)
+{
+    GKeyFile *config;
+    GError *error = NULL;
+    GIOChannel *ioc;
+    GIOStatus status;
+    gchar *data, *curr;
+    gsize len;
+    gssize nwritten;
+ 
+    if (settings->config_file == NULL)
+        return;
+
+    /* load configuration file */
+    config = g_key_file_new ();
+    g_key_file_load_from_file (config, settings->config_file, 0, &error);
+    if (error) {
+        g_warning ("failed to open %s: %s", settings->config_file, error->message);
+        g_error_free (error);
+        g_key_file_free (config);
+        return;
+    }
+
+    /* write settings to config */
+    g_key_file_set_integer (config, "main", "cycle-time", settings->cycle_time);
+    g_key_file_set_boolean (config, "main", "start-fullscreen", settings->start_fullscreen);
+    g_key_file_set_boolean (config, "main", "disable-plugins", settings->disable_plugins);
+    g_key_file_set_boolean (config, "main", "disable-scripts", settings->disable_scripts);
+
+    /* write config to file */
+    ioc = g_io_channel_new_file (settings->config_file, "w", &error);
+    if (error) {
+        g_warning ("failed to open %s for writing: %s", settings->config_file, error->message);
+        g_error_free (error);
+        g_key_file_free (config);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return;
+    }
+    curr = data = g_key_file_to_data (config, &len, &error);
+    again:
+    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+    curr += nwritten;
+    len -= nwritten;
+    if (status == G_IO_STATUS_AGAIN)
+        goto again;
+    if (len > 0)
+        goto again;
+    g_free (data);
+    if (status == G_IO_STATUS_ERROR) {
+        g_warning ("error writing config to %s: %s", settings->config_file, error->message);
+        g_error_free (error);
+    }
+    else
+        g_debug ("wrote config to %s", settings->config_file);
+
+    g_key_file_free (config);
+    g_io_channel_unref (ioc);
+}
+
+/*
  * read_urls_file: load URLs from settings->urls_file.  the format of
  *   this file is one URL per line.  leading and trailing whitespace is
  *   removed before parsing the URL.  username and password can be
@@ -179,6 +244,90 @@ read_urls_file (EESettings *settings)
     g_io_channel_unref (ioc);
 }
 
+/*
+ * write_urls_file: write URLs to settings->urls_file.
+ */
+static void
+write_urls_file (EESettings *settings)
+{
+    GIOChannel *ioc;
+    GError *error = NULL;
+    GIOStatus status;
+    GList *item;
+    SoupURI *uri;
+    GString *str;
+    gchar *data, *curr;
+    gssize len;
+    gsize nwritten;
+
+    if (settings->urls_file == NULL)
+        return;
+
+    /* try to open the urls file */
+    ioc = g_io_channel_new_file (settings->urls_file, "w", &error);
+    if (error) {
+        g_warning ("failed to open %s for writing: %s", settings->urls_file, error->message);
+        g_error_free (error);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return;
+    }
+
+    /* loop reading each line of the file */
+    for (item = settings->urls; item; item = g_list_next (item)) {
+        uri = (SoupURI *) item->data;
+        str = g_string_new (NULL);
+        /* append the scheme */
+        if (uri->scheme == SOUP_URI_SCHEME_HTTP)
+            g_string_append_printf (str, "%s://", SOUP_URI_SCHEME_HTTP);
+        else if (uri->scheme == SOUP_URI_SCHEME_HTTPS)
+            g_string_append_printf (str, "%s://", SOUP_URI_SCHEME_HTTPS);
+        else {
+                g_string_free (str, TRUE);
+                continue;
+        }
+        /* append the username and password */
+        if (uri->user) {
+            str = g_string_append (str, uri->user);
+            if (uri->password)
+                g_string_append_printf (str, ":%s", uri->password);
+            str = g_string_append (str, "@");
+        }
+        /* append the host */
+        g_string_append (str, uri->host);
+        /* append the port */
+        if (uri->port != 80)
+            g_string_append_printf (str, ":%i", uri->port);
+        /* append the path */
+        g_string_append (str, uri->path);
+        if (uri->query)
+            g_string_append_printf (str, "?%s", uri->query);
+        if (uri->fragment)
+            g_string_append_printf (str, "#%s", uri->fragment);
+        g_string_append (str, "\n");
+        /* write out the string */
+        curr = data = g_string_free (str, FALSE);
+        len = (gssize) strlen (data);
+        /* write string to URLs file */
+        again:
+        status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+        curr += nwritten;
+        len -= nwritten;
+        if (status == G_IO_STATUS_AGAIN)
+            goto again;
+        if (len > 0)
+            goto again;
+        g_free (data);
+        if (status == G_IO_STATUS_ERROR) {
+            g_warning ("error writing urls to %s: %s", settings->urls_file, error->message);
+            g_error_free (error);
+            break;
+        }
+    }
+
+    g_debug ("wrote urls to %s", settings->urls_file);
+    g_io_channel_unref (ioc);
+}
 /*
  * ee_settings_open: create and load a new settings object.  configuration 
  *   data will be loaded from config_file and urls_file if they are specified,
@@ -312,12 +461,18 @@ ee_settings_remove_url (EESettings *settings, guint index)
 void
 ee_settings_close (EESettings *settings)
 {
-    GList *curr;
+    GList *item;
+
+    /* write config to file */
+    write_config_file (settings);
+
+    /* write urls to file */
+    write_urls_file (settings);
 
     /* free urls list */
     if (settings->urls) {
-        for (curr = settings->urls; curr; curr = g_list_next (curr))
-            soup_uri_free ((SoupURI *) curr->data);
+        for (item = settings->urls; item; item = g_list_next (item))
+            soup_uri_free ((SoupURI *) item->data);
         g_list_free (settings->urls);
     }
 
