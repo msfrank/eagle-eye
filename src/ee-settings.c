@@ -1,8 +1,10 @@
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <glib.h>
+#include <gtk/gtk.h>
 #include <libsoup/soup.h>
 #include <ee-settings.h>
 
@@ -18,7 +20,6 @@ read_config_file (EESettings *settings)
     gint window_x;
     gint window_y;
     gboolean start_fullscreen;
-    gint default_screen;
     gboolean disable_plugins;
     gboolean disable_scripts;
     gint toolbar_size;
@@ -67,26 +68,6 @@ read_config_file (EESettings *settings)
     }
     else
         settings->window_y = window_y;
-
-    /* load default-screen parameter */
-    default_screen = g_key_file_get_integer (config, "main", "default-screen", &error);
-    if (error) {
-        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::default-screen");
-        g_error_free (error);
-        error = NULL;
-    }
-    else {
-        GdkDisplay *display;
-        gint n_screens;
-
-        display = gdk_display_get_default ();
-        n_screens = gdk_display_get_n_screens (display);
-        if (default_screen >= n_screens)
-            g_warning ("couldn't find screen %i for default display", default_screen);
-        else
-            settings->default_screen = gdk_display_get_screen (display, default_screen);
-    }
 
     /* load cycle-time parameter */
     cycle_time = g_key_file_get_integer (config, "main", "cycle-time", &error);
@@ -202,11 +183,11 @@ write_config_file (EESettings *settings)
         goto again;
     g_free (data);
     if (status == G_IO_STATUS_ERROR) {
-        g_warning ("error writing config to %s: %s", settings->config_file, error->message);
+        g_warning ("error writing configuration to %s: %s", settings->config_file, error->message);
         g_error_free (error);
     }
     else
-        g_debug ("wrote config to %s", settings->config_file);
+        g_debug ("wrote configuration to %s", settings->config_file);
 
     g_key_file_free (config);
     g_io_channel_unref (ioc);
@@ -247,7 +228,7 @@ read_urls_file (EESettings *settings)
         if (status == G_IO_STATUS_EOF)
             break;
         if (status == G_IO_STATUS_ERROR) {
-            g_warning ("error parsing urls file: %s", error->message);
+            g_warning ("error parsing URLs file: %s", error->message);
             g_error_free (error);
             break;
         }
@@ -346,20 +327,58 @@ write_urls_file (EESettings *settings)
         }
     }
 
-    g_debug ("wrote urls to %s", settings->urls_file);
+    g_debug ("wrote URLs to %s", settings->urls_file);
     g_io_channel_unref (ioc);
 }
+
+static gboolean
+on_parse_version_option (const gchar *      name,
+                         const gchar *      value,
+                         gpointer           data,
+                         GError **          error)
+{
+    g_print ("%s %s\n", PACKAGE_NAME, PACKAGE_VERSION);
+    exit (0);
+    /* we never get here, but gets rid of the compiler warning */
+    return TRUE;
+}
+
 /*
- * ee_settings_open: create and load a new settings object.  configuration 
- *   data will be loaded from config_file and urls_file if they are specified,
+ * ee_settings_load: create and load a new settings object.  configuration 
+ *   data will be loaded from --config and --urls if they are specified,
  *   otherwise the data will be retrieved from $HOME/.eagle-eye/config and
  *   $HOME/.eagle-eye/urls, respectively.
  */
 EESettings *
-ee_settings_open (const gchar *config_file, const gchar *urls_file)
+ee_settings_load (int *argc, char ***argv)
 {
+    GOptionContext *ct;
     EESettings *settings;
+    GError *error = NULL;
     gchar *home;
+    gchar *config_file = NULL;
+    gchar *urls_file = NULL;
+    gchar *geometry = NULL;
+
+    GOptionEntry entries[] = 
+    {
+        { "config", 'c', 0, G_OPTION_ARG_FILENAME, &config_file, "Use specified configuration file", "PATH" },
+        { "urls", 'u', 0, G_OPTION_ARG_FILENAME, &urls_file, "Use specified urls file", "PATH" },
+        { "geometry", 0, 0, G_OPTION_ARG_STRING, &geometry, "Set the window geometry from the provided X geometry specification", "GEOMETRY" },
+        { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, on_parse_version_option, "Display program version", NULL },
+        { NULL }
+    };
+
+    /* parse command line arguments */
+    ct = g_option_context_new ("[URL...]");
+    g_option_context_set_summary (ct, "Iterate through web pages at regular intervals");
+    g_option_context_add_group (ct, gtk_get_option_group (TRUE));
+    g_option_context_add_main_entries (ct, entries, NULL);
+    if (!g_option_context_parse (ct, argc, argv, &error)) {
+        g_print ("failed to parse options: %s\n", error->message);
+        exit (1);
+    }
+    g_option_context_free (ct);
 
     /* alloc the settings object and set some defaults */
     settings = g_new0 (EESettings, 1);
@@ -368,7 +387,6 @@ ee_settings_open (const gchar *config_file, const gchar *urls_file)
     settings->window_x = 800;
     settings->window_y = 600;
     settings->start_fullscreen = FALSE;
-    settings->default_screen = NULL;
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
     settings->toolbar_size = 3;
@@ -398,6 +416,10 @@ ee_settings_open (const gchar *config_file, const gchar *urls_file)
     if (settings->urls_file == NULL && home)
         settings->urls_file = g_build_filename (home, "urls", NULL);
     read_urls_file (settings);
+
+    /* load geometry from the command line, if specified */
+    if (geometry != NULL)
+        settings->window_geometry = g_strdup (geometry);
 
     /* open the cookie jar */
     if (settings->cookies_file == NULL && home)
@@ -481,7 +503,7 @@ ee_settings_remove_url (EESettings *settings, guint index)
  * ee_settings_close: free all memory associated with the settings object
  */
 void
-ee_settings_close (EESettings *settings)
+ee_settings_save (EESettings *settings)
 {
     GList *item;
 

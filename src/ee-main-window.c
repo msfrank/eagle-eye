@@ -335,8 +335,6 @@ ee_main_window_construct(EESettings *settings)
     window = (GtkWindow *) gtk_window_new (GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title (window, "Eagle Eye");
     gtk_window_set_default_size (window, settings->window_x, settings->window_y);
-    if (settings->default_screen)
-        gtk_window_set_screen (window, settings->default_screen);
     mainwin->window = window;
     g_signal_connect (window, "destroy",
         G_CALLBACK (on_window_destroy), mainwin);
@@ -435,6 +433,13 @@ ee_main_window_construct(EESettings *settings)
     gtk_container_add (GTK_CONTAINER (status_item), align);
     gtk_tool_item_set_expand(status_item, TRUE);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), status_item, -1);
+
+    /* if window geometry was specified, then set it now */
+    gtk_widget_show_all (GTK_WIDGET (vbox));
+    if (settings->window_geometry) {
+        if (!gtk_window_parse_geometry (window, settings->window_geometry))
+            g_warning ("failed to parse window geometry '%s'", settings->window_geometry);
+    }
 
     gtk_widget_show_all (GTK_WIDGET (window));
 
