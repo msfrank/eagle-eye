@@ -2,6 +2,7 @@
 #define EE_SETTINGS_H
 
 #include <glib.h>
+#include <gdk/gdk.h>
 #include <libsoup/soup.h>
 
 typedef struct {
@@ -12,6 +13,7 @@ typedef struct {
     gint window_x;
     gint window_y;
     gboolean start_fullscreen;
+    GdkScreen *default_screen;
     gboolean disable_plugins;
     gboolean disable_scripts;
     guint toolbar_size;

@@ -335,6 +335,8 @@ ee_main_window_construct(EESettings *settings)
     window = (GtkWindow *) gtk_window_new (GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title (window, "Eagle Eye");
     gtk_window_set_default_size (window, settings->window_x, settings->window_y);
+    if (settings->default_screen)
+        gtk_window_set_screen (window, settings->default_screen);
     mainwin->window = window;
     g_signal_connect (window, "destroy",
         G_CALLBACK (on_window_destroy), mainwin);

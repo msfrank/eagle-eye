@@ -18,6 +18,7 @@ read_config_file (EESettings *settings)
     gint window_x;
     gint window_y;
     gboolean start_fullscreen;
+    gint default_screen;
     gboolean disable_plugins;
     gboolean disable_scripts;
     gint toolbar_size;
@@ -66,6 +67,26 @@ read_config_file (EESettings *settings)
     }
     else
         settings->window_y = window_y;
+
+    /* load default-screen parameter */
+    default_screen = g_key_file_get_integer (config, "main", "default-screen", &error);
+    if (error) {
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::default-screen");
+        g_error_free (error);
+        error = NULL;
+    }
+    else {
+        GdkDisplay *display;
+        gint n_screens;
+
+        display = gdk_display_get_default ();
+        n_screens = gdk_display_get_n_screens (display);
+        if (default_screen >= n_screens)
+            g_warning ("couldn't find screen %i for default display", default_screen);
+        else
+            settings->default_screen = gdk_display_get_screen (display, default_screen);
+    }
 
     /* load cycle-time parameter */
     cycle_time = g_key_file_get_integer (config, "main", "cycle-time", &error);
@@ -347,6 +368,7 @@ ee_settings_open (const gchar *config_file, const gchar *urls_file)
     settings->window_x = 800;
     settings->window_y = 600;
     settings->start_fullscreen = FALSE;
+    settings->default_screen = NULL;
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
     settings->toolbar_size = 3;
