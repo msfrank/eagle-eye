@@ -9,6 +9,7 @@ on_cycle_time_changed (GtkSpinButton *      button,
 {
     mainwin->settings->cycle_time =
         (gint) gtk_spin_button_get_value (GTK_SPIN_BUTTON (button));
+    ee_settings_save (mainwin->settings);
 }
 
 void
@@ -17,6 +18,7 @@ on_start_fullscreen (GtkToggleButton *      button,
 {
     mainwin->settings->start_fullscreen = 
         gtk_toggle_button_get_active (button);
+    ee_settings_save (mainwin->settings);
 }
 
 void
@@ -27,6 +29,7 @@ on_disable_plugins (GtkToggleButton *       button,
     WebKitWebSettings *websettings = webkit_web_view_get_settings (mainwin->webview);
     mainwin->settings->disable_plugins = disable_plugins;
     g_object_set (websettings, "enable-plugins", !disable_plugins, NULL);
+    ee_settings_save (mainwin->settings);
 }
 
 void
@@ -37,6 +40,7 @@ on_disable_scripts (GtkToggleButton *       button,
     WebKitWebSettings *websettings = webkit_web_view_get_settings (mainwin->webview);
     mainwin->settings->disable_scripts = disable_scripts;
     g_object_set (websettings, "enable-scripts", !disable_scripts, NULL);
+    ee_settings_save (mainwin->settings);
 }
 
 /*

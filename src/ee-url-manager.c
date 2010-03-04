@@ -31,6 +31,7 @@ on_row_inserted (GtkTreeModel *         model,
     if (ee_settings_insert_url (settings, uri, indices[0]))
         g_debug ("inserted row at position %i", indices[0]);
     soup_uri_free (uri);
+    ee_settings_save(settings);
 }
 
 /*
@@ -53,6 +54,7 @@ on_row_deleted (GtkTreeModel *          model,
     }
     ee_settings_remove_url (settings, (guint) indices[0]);
     g_debug ("deleted row at position %i", (guint) indices[0]);
+    ee_settings_save(settings);
 }
 
 /*

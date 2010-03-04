@@ -25,5 +25,6 @@ gboolean ee_settings_insert_url (EESettings *settings, SoupURI *url, gint positi
 gboolean ee_settings_insert_url_from_string (EESettings *settings, const gchar *url, gint position);
 gboolean ee_settings_remove_url (EESettings *settings, guint index);
 void ee_settings_save (EESettings *settings);
+void ee_settings_free (EESettings *settings);
 
 #endif

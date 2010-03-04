@@ -484,7 +484,9 @@ ee_settings_insert_url_from_string (EESettings *settings, const gchar *url, gint
 }
 
 /*
- * ee_settings_remove_url:
+ * ee_settings_remove_url: remove the URL at the specified index.
+ *   returns TRUE if removal succeeded, otherwise FALSE if there was
+ *   an error.
  */
 gboolean
 ee_settings_remove_url (EESettings *settings, guint index)
@@ -500,18 +502,22 @@ ee_settings_remove_url (EESettings *settings, guint index)
 }
 
 /*
- * ee_settings_close: free all memory associated with the settings object
+ * ee_settings_save: save settings to disk.
  */
 void
 ee_settings_save (EESettings *settings)
 {
-    GList *item;
-
-    /* write config to file */
     write_config_file (settings);
-
-    /* write urls to file */
     write_urls_file (settings);
+}
+
+/*
+ * ee_settings_free: free all memory associated with the settings object.
+ */
+void
+ee_settings_free (EESettings *settings)
+{
+    GList *item;
 
     /* free urls list */
     if (settings->urls) {

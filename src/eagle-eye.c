@@ -31,6 +31,7 @@ main (int argc, char *argv[])
 
     /* save settings to disk*/
     ee_settings_save (settings);
+    ee_settings_free (settings);
 
     return 0;
 }
