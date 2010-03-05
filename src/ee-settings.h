@@ -5,18 +5,15 @@
 #include <libsoup/soup.h>
 
 typedef struct {
-    gchar *config_file;
-    gchar *urls_file;
+    gchar *home;
     GList *urls;
     gint cycle_time;
-    gint window_x;
-    gint window_y;
     gboolean start_fullscreen;
-    gchar *window_geometry;
     gboolean disable_plugins;
     gboolean disable_scripts;
-    guint toolbar_size;
-    gchar *cookies_file;
+    gboolean small_toolbar;
+    gboolean remember_geometry;
+    gchar *window_geometry;
     SoupCookieJar *cookie_jar;
 } EESettings;
 

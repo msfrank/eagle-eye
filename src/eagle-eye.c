@@ -18,6 +18,8 @@ main (int argc, char *argv[])
 
     /* load settings */
     settings = ee_settings_load (&argc, &argv);
+    if (settings == NULL)
+        return 1;
 
     /* prepend URLs listed on the command line in reverse order */
     for (argc--; argc > 0; argc--)

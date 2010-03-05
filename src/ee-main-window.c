@@ -334,7 +334,7 @@ ee_main_window_construct(EESettings *settings)
     /* create the toplevel window */ 
     window = (GtkWindow *) gtk_window_new (GTK_WINDOW_TOPLEVEL);
     gtk_window_set_title (window, "Eagle Eye");
-    gtk_window_set_default_size (window, settings->window_x, settings->window_y);
+    gtk_window_set_default_size (window, 800, 600);
     mainwin->window = window;
     g_signal_connect (window, "destroy",
         G_CALLBACK (on_window_destroy), mainwin);
@@ -384,7 +384,7 @@ ee_main_window_construct(EESettings *settings)
     /* create the toolbar */
     toolbar = gtk_toolbar_new ();
     gtk_box_pack_start(GTK_BOX (vbox), toolbar, FALSE, FALSE, 0);
-    g_object_set (toolbar, "icon-size", settings->toolbar_size, NULL);
+    g_object_set (toolbar, "icon-size", settings->small_toolbar? 1 : 3, NULL);
 
     /* add the toolbar items */
     back = gtk_tool_button_new_from_stock (GTK_STOCK_MEDIA_PREVIOUS);

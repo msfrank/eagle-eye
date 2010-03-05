@@ -9,32 +9,115 @@
 #include <ee-settings.h>
 
 /*
- * read_config_file: load configuration from settings->config_file.
+ * write_config_file: write configuration to config.
  */
-static void
+static gboolean
+write_config_file (EESettings *settings)
+{
+    GKeyFile *config;
+    gchar *config_file = NULL;
+    GError *error = NULL;
+    GIOChannel *ioc;
+    GIOStatus status;
+    gchar *data, *curr;
+    gsize len;
+    gssize nwritten;
+ 
+    /* load configuration file */
+    config = g_key_file_new ();
+    config_file = g_build_filename (settings->home, "config", NULL);
+    g_key_file_load_from_file (config, config_file, 0, &error);
+    if (error) {
+        if (error->domain == G_FILE_ERROR && error->code == G_FILE_ERROR_NOENT) {
+            g_error_free (error);
+            error = NULL;
+        }
+        else {
+            g_critical ("failed to open %s: %s", config_file, error->message);
+            g_error_free (error);
+            g_key_file_free (config);
+            g_free (config_file);
+            return FALSE;
+        }
+    }
+
+    /* write settings to config */
+    g_key_file_set_integer (config, "main", "cycle-time", settings->cycle_time);
+    g_key_file_set_boolean (config, "main", "start-fullscreen", settings->start_fullscreen);
+    g_key_file_set_boolean (config, "main", "disable-plugins", settings->disable_plugins);
+    g_key_file_set_boolean (config, "main", "disable-scripts", settings->disable_scripts);
+    g_key_file_set_boolean (config, "main", "small-toolbar", settings->small_toolbar);
+    g_key_file_set_boolean (config, "main", "remember-geometry", settings->remember_geometry);
+
+    /* write config to file */
+    ioc = g_io_channel_new_file (config_file, "w", &error);
+    if (error) {
+        g_critical ("failed to open %s for writing: %s", config_file, error->message);
+        g_error_free (error);
+        g_key_file_free (config);
+        g_free (config_file);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    curr = data = g_key_file_to_data (config, &len, &error);
+    again:
+    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+    curr += nwritten;
+    len -= nwritten;
+    if (status == G_IO_STATUS_AGAIN)
+        goto again;
+    if (len > 0)
+        goto again;
+    g_free (data);
+    if (status == G_IO_STATUS_ERROR) {
+        g_critical ("error writing configuration to %s: %s", config_file, error->message);
+        g_error_free (error);
+        g_free (config_file);
+        g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    else
+        g_debug ("wrote configuration to %s", config_file);
+
+    g_key_file_free (config);
+    g_free (config_file);
+    g_io_channel_unref (ioc);
+    return TRUE;
+}
+
+/*
+ * read_config_file: load configuration from config.
+ */
+static gboolean
 read_config_file (EESettings *settings)
 {
+    gchar *config_file = NULL;
     GKeyFile *config;
     GError *error = NULL;
     gint cycle_time;
-    gint window_x;
-    gint window_y;
     gboolean start_fullscreen;
     gboolean disable_plugins;
     gboolean disable_scripts;
-    gint toolbar_size;
-    gchar *cookies_file;
+    gboolean small_toolbar;
+    gboolean remember_geometry;
+
+    config_file = g_build_filename (settings->home, "config", NULL);
+    if (!g_file_test (config_file, G_FILE_TEST_IS_REGULAR))
+        return write_config_file (settings);
 
     /* load configuration file */
     config = g_key_file_new ();
-    g_key_file_load_from_file (config, settings->config_file, 0, &error);
+    g_key_file_load_from_file (config, config_file, 0, &error);
     if (error) {
-        g_warning ("failed to open %s: %s", settings->config_file, error->message);
+        g_critical ("failed to open %s: %s", config_file, error->message);
         g_error_free (error);
         g_key_file_free (config);
-        return;
+        g_free (config_file);
+        return FALSE;
     }
-    g_debug ("loading configuration from %s", settings->config_file);
+    g_debug ("loading configuration from %s", config_file);
+    g_free (config_file);
 
     /* load start-fullscreen parameter */
     start_fullscreen = g_key_file_get_boolean (config, "main", "start-fullscreen", &error);
@@ -46,28 +129,6 @@ read_config_file (EESettings *settings)
     }
     else
         settings->start_fullscreen = start_fullscreen;
-
-    /* load window-x parameter */
-    window_x = g_key_file_get_integer (config, "main", "window-x", &error);
-    if (error) {
-        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::window-x");
-        g_error_free (error);
-        error = NULL;
-    }
-    else
-        settings->window_x = window_x;
-
-    /* load window-y parameter */
-    window_y = g_key_file_get_integer (config, "main", "window-y", &error);
-    if (error) {
-        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::window-y");
-        g_error_free (error);
-        error = NULL;
-    }
-    else
-        settings->window_y = window_y;
 
     /* load cycle-time parameter */
     cycle_time = g_key_file_get_integer (config, "main", "cycle-time", &error);
@@ -102,156 +163,39 @@ read_config_file (EESettings *settings)
     else
         settings->disable_scripts = disable_scripts;
 
-    /* load toolbar-size parameter */
-    toolbar_size = g_key_file_get_integer (config, "main", "toolbar-size", &error);
+    /* load small-toolbar parameter */
+    small_toolbar = g_key_file_get_boolean (config, "main", "small-toolbar", &error);
     if (error) {
         if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::toolbar-size");
-        g_error_free (error);
-        error = NULL;
-    }
-    else if (toolbar_size < 0)
-        g_warning ("configuration error: value for main::toolbar-size is < 0");
-    else
-        settings->toolbar_size = (guint) toolbar_size;
-
-    /* load cookies-file parameter */
-    cookies_file = g_key_file_get_string (config, "main", "cookies-file", &error);
-    if (error) {
-        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::cookies-file");
+            g_warning ("configuration error: failed to parse main::small-toolbar");
         g_error_free (error);
         error = NULL;
     }
     else
-        settings->cookies_file = cookies_file;
+        settings->small_toolbar = small_toolbar;
 
-    g_key_file_free (config);
-}
-
-/*
- * write_config_file: write configuration to settings->config_file.
- */
-static void
-write_config_file (EESettings *settings)
-{
-    GKeyFile *config;
-    GError *error = NULL;
-    GIOChannel *ioc;
-    GIOStatus status;
-    gchar *data, *curr;
-    gsize len;
-    gssize nwritten;
- 
-    if (settings->config_file == NULL)
-        return;
-
-    /* load configuration file */
-    config = g_key_file_new ();
-    g_key_file_load_from_file (config, settings->config_file, 0, &error);
+    /* load remember-geometry parameter */
+    remember_geometry = g_key_file_get_boolean (config, "main", "remember-geometry", &error);
     if (error) {
-        g_warning ("failed to open %s: %s", settings->config_file, error->message);
+        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
+            g_warning ("configuration error: failed to parse main::remember-geometry");
         g_error_free (error);
-        g_key_file_free (config);
-        return;
-    }
-
-    /* write settings to config */
-    g_key_file_set_integer (config, "main", "cycle-time", settings->cycle_time);
-    g_key_file_set_boolean (config, "main", "start-fullscreen", settings->start_fullscreen);
-    g_key_file_set_boolean (config, "main", "disable-plugins", settings->disable_plugins);
-    g_key_file_set_boolean (config, "main", "disable-scripts", settings->disable_scripts);
-
-    /* write config to file */
-    ioc = g_io_channel_new_file (settings->config_file, "w", &error);
-    if (error) {
-        g_warning ("failed to open %s for writing: %s", settings->config_file, error->message);
-        g_error_free (error);
-        g_key_file_free (config);
-        if (ioc)
-            g_io_channel_unref (ioc);
-        return;
-    }
-    curr = data = g_key_file_to_data (config, &len, &error);
-    again:
-    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
-    curr += nwritten;
-    len -= nwritten;
-    if (status == G_IO_STATUS_AGAIN)
-        goto again;
-    if (len > 0)
-        goto again;
-    g_free (data);
-    if (status == G_IO_STATUS_ERROR) {
-        g_warning ("error writing configuration to %s: %s", settings->config_file, error->message);
-        g_error_free (error);
+        error = NULL;
     }
     else
-        g_debug ("wrote configuration to %s", settings->config_file);
+        settings->remember_geometry = remember_geometry;
 
     g_key_file_free (config);
-    g_io_channel_unref (ioc);
-}
-
-/*
- * read_urls_file: load URLs from settings->urls_file.  the format of
- *   this file is one URL per line.  leading and trailing whitespace is
- *   removed before parsing the URL.  username and password can be
- *   specified using the normal URL syntax, and will be used for HTTP
- *   authentication.
- */
-static void
-read_urls_file (EESettings *settings)
-{
-    GIOChannel *ioc;
-    GError *error = NULL;
-    GIOStatus status;
-    gchar *s;
-    gsize len;
-    
-    /* try to open the urls file */
-    ioc = g_io_channel_new_file (settings->urls_file, "r", &error);
-    if (error) {
-        g_warning ("failed to open %s: %s", settings->urls_file, error->message);
-        g_error_free (error);
-        if (ioc)
-            g_io_channel_unref (ioc);
-        return;
-    }
-    g_debug ("loading URLs from %s", settings->urls_file);
-
-    /* loop reading each line of the file */
-    while (1) {
-        status = g_io_channel_read_line (ioc, &s, &len, NULL, &error);
-        if (status == G_IO_STATUS_AGAIN)
-            continue;
-        if (status == G_IO_STATUS_EOF)
-            break;
-        if (status == G_IO_STATUS_ERROR) {
-            g_warning ("error parsing URLs file: %s", error->message);
-            g_error_free (error);
-            break;
-        }
-        /* remove leading and trailing whitespace */
-        s = g_strstrip (s);
-        /* if string is empty or starts with a '#', then ignore it */
-        if (s[0] == '\0' || s[0] == '#')
-            ;
-        /* otherwise try to append the URL to the end of the urls list */
-        else
-            ee_settings_insert_url_from_string (settings, s, -1);
-        g_free (s);
-    }
-
-    g_io_channel_unref (ioc);
+    return TRUE;
 }
 
 /*
  * write_urls_file: write URLs to settings->urls_file.
  */
-static void
+static gboolean
 write_urls_file (EESettings *settings)
 {
+    gchar *urls_file = NULL;
     GIOChannel *ioc;
     GError *error = NULL;
     GIOStatus status;
@@ -262,17 +206,16 @@ write_urls_file (EESettings *settings)
     gssize len;
     gsize nwritten;
 
-    if (settings->urls_file == NULL)
-        return;
-
     /* try to open the urls file */
-    ioc = g_io_channel_new_file (settings->urls_file, "w", &error);
+    urls_file = g_build_filename (settings->home, "urls", NULL);
+    ioc = g_io_channel_new_file (urls_file, "w", &error);
     if (error) {
-        g_warning ("failed to open %s for writing: %s", settings->urls_file, error->message);
+        g_critical ("failed to open %s for writing: %s", urls_file, error->message);
         g_error_free (error);
+        g_free (urls_file);
         if (ioc)
             g_io_channel_unref (ioc);
-        return;
+        return FALSE;
     }
 
     /* loop reading each line of the file */
@@ -321,16 +264,83 @@ write_urls_file (EESettings *settings)
             goto again;
         g_free (data);
         if (status == G_IO_STATUS_ERROR) {
-            g_warning ("error writing urls to %s: %s", settings->urls_file, error->message);
+            g_critical ("error writing urls to %s: %s", urls_file, error->message);
             g_error_free (error);
-            break;
+            g_free (urls_file);
+            g_io_channel_unref (ioc);
+            return FALSE;
         }
     }
 
-    g_debug ("wrote URLs to %s", settings->urls_file);
+    g_debug ("wrote URLs to %s", urls_file);
+    g_free (urls_file);
     g_io_channel_unref (ioc);
+    return TRUE;
 }
 
+/*
+ * read_urls_file: load URLs from settings->urls_file.  the format of
+ *   this file is one URL per line.  leading and trailing whitespace is
+ *   removed before parsing the URL.  username and password can be
+ *   specified using the normal URL syntax, and will be used for HTTP
+ *   authentication.
+ */
+static gboolean
+read_urls_file (EESettings *settings)
+{
+    gchar *urls_file = NULL;
+    GIOChannel *ioc;
+    GError *error = NULL;
+    GIOStatus status;
+    gchar *s;
+    gsize len;
+    
+    urls_file = g_build_filename (settings->home, "urls", NULL);
+    if (!g_file_test (urls_file, G_FILE_TEST_IS_REGULAR))
+        return write_urls_file (settings);
+
+    /* try to open the urls file */
+    ioc = g_io_channel_new_file (urls_file, "r", &error);
+    if (error) {
+        g_critical ("failed to open %s: %s", urls_file, error->message);
+        g_error_free (error);
+        g_free (urls_file);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    g_debug ("loading URLs from %s", urls_file);
+    g_free (urls_file);
+
+    /* loop reading each line of the file */
+    while (1) {
+        status = g_io_channel_read_line (ioc, &s, &len, NULL, &error);
+        if (status == G_IO_STATUS_AGAIN)
+            continue;
+        if (status == G_IO_STATUS_EOF)
+            break;
+        if (status == G_IO_STATUS_ERROR) {
+            g_critical ("error parsing URLs file: %s", error->message);
+            g_error_free (error);
+            g_io_channel_unref (ioc);
+            return FALSE;
+        }
+        /* remove leading and trailing whitespace */
+        s = g_strstrip (s);
+        /* if string is empty or starts with a '#', then ignore it */
+        if (s[0] == '\0' || s[0] == '#')
+            ;
+        /* otherwise try to append the URL to the end of the urls list */
+        else
+            ee_settings_insert_url_from_string (settings, s, -1);
+        g_free (s);
+    }
+
+    g_io_channel_unref (ioc);
+    return TRUE;
+}
+
+/* display the version and exit */
 static gboolean
 on_parse_version_option (const gchar *      name,
                          const gchar *      value,
@@ -345,9 +355,9 @@ on_parse_version_option (const gchar *      name,
 
 /*
  * ee_settings_load: create and load a new settings object.  configuration 
- *   data will be loaded from --config and --urls if they are specified,
- *   otherwise the data will be retrieved from $HOME/.eagle-eye/config and
- *   $HOME/.eagle-eye/urls, respectively.
+ *   data will be loaded from the directory specified by --config, otherwise
+ *   the data will be retrieved from $HOME/.eagle-eye/.  Returns a new
+ *   EESettings object if loading succeeded, otherwise returns NULL.
  */
 EESettings *
 ee_settings_load (int *argc, char ***argv)
@@ -355,15 +365,16 @@ ee_settings_load (int *argc, char ***argv)
     GOptionContext *ct;
     EESettings *settings;
     GError *error = NULL;
-    gchar *home;
+    gchar *home = NULL;
     gchar *config_file = NULL;
     gchar *urls_file = NULL;
+    gchar *geometry_file = NULL;
+    gchar *cookies_file = NULL;
     gchar *geometry = NULL;
 
     GOptionEntry entries[] = 
     {
-        { "config", 'c', 0, G_OPTION_ARG_FILENAME, &config_file, "Use specified configuration file", "PATH" },
-        { "urls", 'u', 0, G_OPTION_ARG_FILENAME, &urls_file, "Use specified urls file", "PATH" },
+        { "config", 'c', 0, G_OPTION_ARG_FILENAME, &home, "Use DIR for storing configuration files", "DIR" },
         { "geometry", 0, 0, G_OPTION_ARG_STRING, &geometry, "Set the window geometry from the provided X geometry specification", "GEOMETRY" },
         { "version", 0, G_OPTION_FLAG_NO_ARG, G_OPTION_ARG_CALLBACK, on_parse_version_option, "Display program version", NULL },
         { NULL }
@@ -376,58 +387,57 @@ ee_settings_load (int *argc, char ***argv)
     g_option_context_add_main_entries (ct, entries, NULL);
     if (!g_option_context_parse (ct, argc, argv, &error)) {
         g_print ("failed to parse options: %s\n", error->message);
-        exit (1);
+        g_print ("\n");
+        g_print ("Try '%s --help' for command line usage.\n", g_get_prgname ());
+        g_option_context_free (ct);
+        return NULL;
     }
     g_option_context_free (ct);
 
     /* alloc the settings object and set some defaults */
     settings = g_new0 (EESettings, 1);
+    settings->home = NULL;
     settings->urls = NULL;
     settings->cycle_time = 30;
-    settings->window_x = 800;
-    settings->window_y = 600;
     settings->start_fullscreen = FALSE;
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
-    settings->toolbar_size = 3;
-    settings->config_file = NULL;
-    settings->urls_file = NULL;
-    settings->cookies_file = NULL;
+    settings->small_toolbar = FALSE;
+    settings->remember_geometry = FALSE;
 
-    home = g_build_filename (g_get_home_dir (), ".eagle-eye", NULL);
+    /* if --config wasn't specified, then define it as $HOME/.eagle-eye */
+    if (home)
+        settings->home = g_strdup (home);
+    else
+        settings->home = g_build_filename (g_get_home_dir (), ".eagle-eye", NULL);
 
-    /* create $HOME/.eagle-eye if it doesn't exist */
-    if (mkdir (home, 0755) < 0 && errno != EEXIST) {
-        g_warning ("failed to create %s: %s", home, g_strerror (errno));
-        g_free (home);
-        home = NULL;
+    /* create home if it doesn't exist */
+    if (mkdir (settings->home, 0755) < 0 && errno != EEXIST) {
+        g_warning ("failed to create %s: %s", settings->home, g_strerror (errno));
+        g_free (settings);
+        return NULL;
     }
   
     /* load config parameters */
-    if (config_file)
-        settings->config_file = g_strdup (config_file);
-    if (settings->config_file == NULL && home)
-        settings->config_file = g_build_filename (home, "config", NULL);
-    read_config_file (settings);
+    if (!read_config_file (settings)) {
+        ee_settings_free (settings);
+        return NULL;
+    }
 
     /* load the urls file */
-    if (urls_file)
-        settings->urls_file = g_strdup (urls_file);
-    if (settings->urls_file == NULL && home)
-        settings->urls_file = g_build_filename (home, "urls", NULL);
-    read_urls_file (settings);
+    if (!read_urls_file (settings)) {
+        ee_settings_free (settings);
+        return NULL;
+    }
 
     /* load geometry from the command line, if specified */
     if (geometry != NULL)
         settings->window_geometry = g_strdup (geometry);
 
     /* open the cookie jar */
-    if (settings->cookies_file == NULL && home)
-        settings->cookies_file = g_build_filename (home, "cookies", NULL);
-    if (settings->cookies_file)
-        settings->cookie_jar = soup_cookie_jar_text_new (settings->cookies_file, FALSE);
-
-    g_free (home);
+    cookies_file = g_build_filename (settings->home, "cookies", NULL);
+    settings->cookie_jar = soup_cookie_jar_text_new (cookies_file, FALSE);
+    g_free (cookies_file);
 
     return settings;
 }
