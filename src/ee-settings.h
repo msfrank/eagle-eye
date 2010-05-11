@@ -12,7 +12,6 @@ typedef struct {
     gboolean disable_plugins;
     gboolean disable_scripts;
     gboolean small_toolbar;
-    gboolean remember_geometry;
     gchar *window_geometry;
     SoupCookieJar *cookie_jar;
 } EESettings;

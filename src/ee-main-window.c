@@ -25,7 +25,7 @@ on_window_configure_event (GtkWindow *          window,
                            GdkEventConfigure *  ev,
                            EEMainWindow *       mainwin)
 {
-    if (mainwin->settings->remember_geometry)
+    if (mainwin->settings->window_geometry)
         g_free (mainwin->settings->window_geometry);
     mainwin->settings->window_geometry = g_strdup_printf ("%ix%i+%i+%i",
         ev->width, ev->height, ev->x, ev->y);
@@ -349,9 +349,8 @@ ee_main_window_construct(EESettings *settings)
     mainwin->window = window;
     g_signal_connect (window, "destroy",
         G_CALLBACK (on_window_destroy), mainwin);
-    if (settings->remember_geometry)
-        g_signal_connect (window, "configure-event",
-            G_CALLBACK (on_window_configure_event), mainwin);
+    g_signal_connect (window, "configure-event",
+        G_CALLBACK (on_window_configure_event), mainwin);
     
     /* create the container for the webview and toolbar */
     vbox = gtk_vbox_new (FALSE, 0);

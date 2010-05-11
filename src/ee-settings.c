@@ -47,7 +47,6 @@ write_config_file (EESettings *settings)
     g_key_file_set_boolean (config, "main", "disable-plugins", settings->disable_plugins);
     g_key_file_set_boolean (config, "main", "disable-scripts", settings->disable_scripts);
     g_key_file_set_boolean (config, "main", "small-toolbar", settings->small_toolbar);
-    g_key_file_set_boolean (config, "main", "remember-geometry", settings->remember_geometry);
 
     /* write config to file */
     ioc = g_io_channel_new_file (config_file, "w", &error);
@@ -100,7 +99,6 @@ read_config_file (EESettings *settings)
     gboolean disable_plugins;
     gboolean disable_scripts;
     gboolean small_toolbar;
-    gboolean remember_geometry;
 
     config_file = g_build_filename (settings->home, "config", NULL);
     if (!g_file_test (config_file, G_FILE_TEST_IS_REGULAR))
@@ -173,17 +171,6 @@ read_config_file (EESettings *settings)
     }
     else
         settings->small_toolbar = small_toolbar;
-
-    /* load remember-geometry parameter */
-    remember_geometry = g_key_file_get_boolean (config, "main", "remember-geometry", &error);
-    if (error) {
-        if (error->code == G_KEY_FILE_ERROR_INVALID_VALUE)
-            g_warning ("configuration error: failed to parse main::remember-geometry");
-        g_error_free (error);
-        error = NULL;
-    }
-    else
-        settings->remember_geometry = remember_geometry;
 
     g_key_file_free (config);
     return TRUE;
@@ -354,10 +341,7 @@ write_geometry_file (EESettings *settings)
     gssize len = 0;
     gsize nwritten = 0;
  
-    if (settings->remember_geometry == FALSE || settings->window_geometry == NULL)
-        return TRUE;
-
-    /* write geometry to file */
+    /* open geometry file */
     geometry_file = g_build_filename (settings->home, "geometry", NULL);
     ioc = g_io_channel_new_file (geometry_file, "w", &error);
     if (error) {
@@ -368,25 +352,29 @@ write_geometry_file (EESettings *settings)
             g_io_channel_unref (ioc);
         return FALSE;
     }
-    curr = settings->window_geometry;
-    len = strlen(settings->window_geometry);
-    again:
-    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
-    curr += nwritten;
-    len -= nwritten;
-    if (status == G_IO_STATUS_AGAIN)
-        goto again;
-    if (len > 0)
-        goto again;
-    if (status == G_IO_STATUS_ERROR) {
-        g_critical ("error writing geometry to %s: %s", geometry_file, error->message);
-        g_error_free (error);
-        g_free (geometry_file);
-        g_io_channel_unref (ioc);
-        return FALSE;
+
+    /* if window_geometry is not NULL, then write it to disk */
+    if (settings->window_geometry != NULL) {
+        curr = settings->window_geometry;
+        len = strlen(settings->window_geometry);
+        again:
+        status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+        curr += nwritten;
+        len -= nwritten;
+        if (status == G_IO_STATUS_AGAIN)
+            goto again;
+        if (len > 0)
+            goto again;
+        if (status == G_IO_STATUS_ERROR) {
+            g_critical ("error writing geometry to %s: %s", geometry_file, error->message);
+            g_error_free (error);
+            g_free (geometry_file);
+            g_io_channel_unref (ioc);
+            return FALSE;
+        }
+        else
+            g_debug ("wrote geometry to %s", geometry_file);
     }
-    else
-        g_debug ("wrote geometry to %s", geometry_file);
 
     g_free (geometry_file);
     g_io_channel_unref (ioc);
@@ -406,9 +394,6 @@ read_geometry_file (EESettings *settings)
     gchar *s;
     gsize len;
     
-    if (settings->remember_geometry == FALSE)
-        return TRUE;
-
     geometry_file = g_build_filename (settings->home, "geometry", NULL);
     if (!g_file_test (geometry_file, G_FILE_TEST_IS_REGULAR))
         return write_geometry_file (settings);
@@ -506,7 +491,6 @@ ee_settings_load (int *argc, char ***argv)
     settings->disable_plugins = FALSE;
     settings->disable_scripts = FALSE;
     settings->small_toolbar = FALSE;
-    settings->remember_geometry = FALSE;
 
     /* if --config wasn't specified, then define it as $HOME/.eagle-eye */
     if (home)
