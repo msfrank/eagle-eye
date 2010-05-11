@@ -43,7 +43,6 @@ on_row_deleted (GtkTreeModel *          model,
                 EESettings *            settings)
 {
     gint *indices;
-    guint index;
 
     indices = gtk_tree_path_get_indices (path);
     if (!indices)

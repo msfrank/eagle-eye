@@ -9,7 +9,7 @@
 #include <ee-settings.h>
 
 /*
- * write_config_file: write configuration to config.
+ * write_config_file: write configuration to config file.
  */
 static gboolean
 write_config_file (EESettings *settings)
@@ -21,7 +21,7 @@ write_config_file (EESettings *settings)
     GIOStatus status;
     gchar *data, *curr;
     gsize len;
-    gssize nwritten;
+    gsize nwritten;
  
     /* load configuration file */
     config = g_key_file_new ();
@@ -62,7 +62,7 @@ write_config_file (EESettings *settings)
     }
     curr = data = g_key_file_to_data (config, &len, &error);
     again:
-    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+    status = g_io_channel_write_chars (ioc, curr, (gssize) len, &nwritten, &error);
     curr += nwritten;
     len -= nwritten;
     if (status == G_IO_STATUS_AGAIN)
@@ -190,7 +190,7 @@ read_config_file (EESettings *settings)
 }
 
 /*
- * write_urls_file: write URLs to settings->urls_file.
+ * write_urls_file: write URLs to disk.
  */
 static gboolean
 write_urls_file (EESettings *settings)
@@ -279,8 +279,8 @@ write_urls_file (EESettings *settings)
 }
 
 /*
- * read_urls_file: load URLs from settings->urls_file.  the format of
- *   this file is one URL per line.  leading and trailing whitespace is
+ * read_urls_file: load URLs from urls file.  the format of this file
+ *   is one URL per line.  leading and trailing whitespace is
  *   removed before parsing the URL.  username and password can be
  *   specified using the normal URL syntax, and will be used for HTTP
  *   authentication.
@@ -340,7 +340,113 @@ read_urls_file (EESettings *settings)
     return TRUE;
 }
 
-/* display the version and exit */
+/*
+ * write_geometry_file: write window geometry to disk.
+ */
+static gboolean
+write_geometry_file (EESettings *settings)
+{
+    gchar *geometry_file = NULL;
+    GError *error = NULL;
+    GIOChannel *ioc;
+    GIOStatus status;
+    gchar *curr = NULL;
+    gssize len = 0;
+    gsize nwritten = 0;
+ 
+    if (settings->remember_geometry == FALSE || settings->window_geometry == NULL)
+        return TRUE;
+
+    /* write geometry to file */
+    geometry_file = g_build_filename (settings->home, "geometry", NULL);
+    ioc = g_io_channel_new_file (geometry_file, "w", &error);
+    if (error) {
+        g_critical ("failed to open %s for writing: %s", geometry_file, error->message);
+        g_error_free (error);
+        g_free (geometry_file);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    curr = settings->window_geometry;
+    len = strlen(settings->window_geometry);
+    again:
+    status = g_io_channel_write_chars (ioc, curr, len, &nwritten, &error);
+    curr += nwritten;
+    len -= nwritten;
+    if (status == G_IO_STATUS_AGAIN)
+        goto again;
+    if (len > 0)
+        goto again;
+    if (status == G_IO_STATUS_ERROR) {
+        g_critical ("error writing geometry to %s: %s", geometry_file, error->message);
+        g_error_free (error);
+        g_free (geometry_file);
+        g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    else
+        g_debug ("wrote geometry to %s", geometry_file);
+
+    g_free (geometry_file);
+    g_io_channel_unref (ioc);
+    return TRUE;
+}
+
+/*
+ * read_geometry_file: load window geometry settings.
+ */
+static gboolean
+read_geometry_file (EESettings *settings)
+{
+    gchar *geometry_file = NULL;
+    GIOChannel *ioc;
+    GError *error = NULL;
+    GIOStatus status;
+    gchar *s;
+    gsize len;
+    
+    if (settings->remember_geometry == FALSE)
+        return TRUE;
+
+    geometry_file = g_build_filename (settings->home, "geometry", NULL);
+    if (!g_file_test (geometry_file, G_FILE_TEST_IS_REGULAR))
+        return write_geometry_file (settings);
+
+    /* try to open the geometry file */
+    ioc = g_io_channel_new_file (geometry_file, "r", &error);
+    if (error) {
+        g_critical ("failed to open %s: %s", geometry_file, error->message);
+        g_error_free (error);
+        g_free (geometry_file);
+        if (ioc)
+            g_io_channel_unref (ioc);
+        return FALSE;
+    }
+    g_debug ("loading geometry from %s", geometry_file);
+    g_free (geometry_file);
+
+    /* read the first line of the file */
+    status = g_io_channel_read_line (ioc, &s, &len, NULL, &error);
+    if (status == G_IO_STATUS_ERROR) {
+        g_critical ("error parsing geometry file: %s", error->message);
+        g_error_free (error);
+        g_io_channel_unref (ioc);
+        return FALSE;
+    }
+
+    /* remove leading and trailing whitespace */
+    if (s != NULL)
+        settings->window_geometry = g_strstrip (s);
+    else
+        settings->window_geometry = NULL;
+    g_io_channel_unref (ioc);
+    return TRUE;
+}
+
+/*
+ * display the version and exit
+ */
 static gboolean
 on_parse_version_option (const gchar *      name,
                          const gchar *      value,
@@ -366,9 +472,6 @@ ee_settings_load (int *argc, char ***argv)
     EESettings *settings;
     GError *error = NULL;
     gchar *home = NULL;
-    gchar *config_file = NULL;
-    gchar *urls_file = NULL;
-    gchar *geometry_file = NULL;
     gchar *cookies_file = NULL;
     gchar *geometry = NULL;
 
@@ -430,9 +533,18 @@ ee_settings_load (int *argc, char ***argv)
         return NULL;
     }
 
+    /* load saved window geometry if specified in the config */
+    if (!read_geometry_file (settings)) {
+        ee_settings_free (settings);
+        return NULL;
+    }
+
     /* load geometry from the command line, if specified */
-    if (geometry != NULL)
+    if (geometry != NULL) {
+        if (settings->window_geometry)
+            g_free (settings->window_geometry);
         settings->window_geometry = g_strdup (geometry);
+    }
 
     /* open the cookie jar */
     cookies_file = g_build_filename (settings->home, "cookies", NULL);
@@ -514,11 +626,13 @@ ee_settings_remove_url (EESettings *settings, guint index)
 /*
  * ee_settings_save: save settings to disk.
  */
-void
+gboolean
 ee_settings_save (EESettings *settings)
 {
     write_config_file (settings);
     write_urls_file (settings);
+    write_geometry_file (settings);
+    return TRUE;
 }
 
 /*

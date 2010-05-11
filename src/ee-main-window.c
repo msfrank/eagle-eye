@@ -18,6 +18,21 @@ on_window_destroy (GtkWindow *          window,
 }
 
 /*
+ * on_window_configure_event: save the window geometry
+ */
+static gboolean
+on_window_configure_event (GtkWindow *          window,
+                           GdkEventConfigure *  ev,
+                           EEMainWindow *       mainwin)
+{
+    if (mainwin->settings->remember_geometry)
+        g_free (mainwin->settings->window_geometry);
+    mainwin->settings->window_geometry = g_strdup_printf ("%ix%i+%i+%i",
+        ev->width, ev->height, ev->x, ev->y);
+    return FALSE;
+}
+
+/*
  * on_load_started: callback when we start loading a new URL
  */
 static void
@@ -97,7 +112,6 @@ on_title_changed (WebKitWebView *       webview,
 static gboolean
 load_url (EEMainWindow *mainwin)
 {
-    SoupURI *url;
     gchar *s;
 
     if (mainwin->curr_url == NULL)
@@ -254,7 +268,6 @@ on_clicked_edit (GtkToolButton *        button,
                  EEMainWindow *         mainwin)
 {
     GtkWidget *dialog;
-    gint result;
 
     g_debug ("---- EDIT ----");
     dialog = ee_url_manager_new (mainwin->settings);
@@ -269,8 +282,6 @@ static void
 on_clicked_prefs (GtkToolButton *       button,
                   EEMainWindow *        mainwin)
 {
-    GtkWidget *dialog;
-
     g_debug ("---- PREFERENCES ----");
     ee_prefs_dialog_run (mainwin);
 }
@@ -338,6 +349,9 @@ ee_main_window_construct(EESettings *settings)
     mainwin->window = window;
     g_signal_connect (window, "destroy",
         G_CALLBACK (on_window_destroy), mainwin);
+    if (settings->remember_geometry)
+        g_signal_connect (window, "configure-event",
+            G_CALLBACK (on_window_configure_event), mainwin);
     
     /* create the container for the webview and toolbar */
     vbox = gtk_vbox_new (FALSE, 0);
@@ -418,7 +432,7 @@ ee_main_window_construct(EESettings *settings)
         G_CALLBACK (on_clicked_edit), mainwin);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), edit, -1);
     prefs = gtk_tool_button_new_from_stock (GTK_STOCK_PREFERENCES);
-    gtk_tool_item_set_tooltip_text (edit, "Preferences");
+    gtk_tool_item_set_tooltip_text (prefs, "Preferences");
     g_signal_connect (prefs, "clicked",
         G_CALLBACK (on_clicked_prefs), mainwin);
     gtk_toolbar_insert (GTK_TOOLBAR (toolbar), prefs, -1);
@@ -439,6 +453,8 @@ ee_main_window_construct(EESettings *settings)
     if (settings->window_geometry) {
         if (!gtk_window_parse_geometry (window, settings->window_geometry))
             g_warning ("failed to parse window geometry '%s'", settings->window_geometry);
+        else
+            g_debug ("resizing window geometry to %s", settings->window_geometry);
     }
 
     gtk_widget_show_all (GTK_WIDGET (window));
